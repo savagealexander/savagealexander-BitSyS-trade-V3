@@ -1,7 +1,11 @@
 """Bitget exchange connectors."""
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import Dict, Optional
+
+import hmac
+import time
+from hashlib import sha256
 
 import httpx
 import websockets
@@ -30,6 +34,35 @@ class BitgetConnector:
             return int(data.get("serverTime")) if data else None
         except Exception:
             return None
+
+    async def get_balance(self, api_key: str, api_secret: str) -> Dict[str, float]:
+        """Return available BTC and USDT balances.
+
+        Uses the ``/api/spot/v1/account/assets`` endpoint which requires a
+        signed request. Failures result in zero balances being returned.
+        """
+        try:
+            ts = str(int(time.time() * 1000))
+            method = "GET"
+            path = "/api/spot/v1/account/assets"
+            prehash = f"{ts}{method}{path}"
+            sign = hmac.new(api_secret.encode(), prehash.encode(), sha256).hexdigest()
+            headers = {
+                "ACCESS-KEY": api_key,
+                "ACCESS-SIGN": sign,
+                "ACCESS-TIMESTAMP": ts,
+            }
+            resp = await self._client.get(path, headers=headers)
+            resp.raise_for_status()
+            data = resp.json().get("data", [])
+            result: Dict[str, float] = {"BTC": 0.0, "USDT": 0.0}
+            for item in data:
+                coin = item.get("coinName")
+                if coin in result:
+                    result[coin] = float(item.get("available", 0.0))
+            return result
+        except Exception:
+            return {"BTC": 0.0, "USDT": 0.0}
 
     async def ws_connect(self, channel: str):
         """Return a websocket connection for a given channel."""

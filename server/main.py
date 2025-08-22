@@ -3,12 +3,14 @@
 from fastapi import FastAPI
 
 from .api import router as api_router
+from .balances import balance_service
 
 
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
     app = FastAPI()
     app.include_router(api_router, prefix="/api")
+    app.add_event_handler("startup", balance_service.start)
     return app
 
 
