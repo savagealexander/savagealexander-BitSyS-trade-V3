@@ -1,15 +1,40 @@
 """API routes for the trading service."""
 
 import asyncio
-from fastapi import APIRouter
+import os
+from typing import Any, Dict, List
 
+from fastapi import APIRouter, Header, HTTPException
+from pydantic import BaseModel
+
+from . import leader_watcher
+from .accounts import AccountStatus, account_service
 from .balances import balance_service
 from .copy_dispatcher import copy_dispatcher
 from .models import LeaderConfig, StatusResponse
 from .storage import save_leader_credentials
-from . import leader_watcher
-from typing import Dict
 
+
+# ---------------------------------------------------------------------------
+# Authentication helpers
+# ---------------------------------------------------------------------------
+
+API_TOKEN = os.getenv("API_TOKEN", "")
+
+
+async def verify_token(authorization: str = Header("")) -> None:
+    """Validate ``Authorization`` header against ``API_TOKEN`` env var."""
+
+    if not API_TOKEN:
+        return
+    expected = f"Bearer {API_TOKEN}"
+    if authorization != expected and authorization != API_TOKEN:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+
+# ---------------------------------------------------------------------------
+# Background tasks
+# ---------------------------------------------------------------------------
 
 _leader_task: asyncio.Task | None = None
 
@@ -20,22 +45,33 @@ async def _run_leader_watcher(cfg: LeaderConfig) -> None:
     ):
         await copy_dispatcher.dispatch(event)
 
-router = APIRouter()
+
+# Routers
+public_router = APIRouter()
+protected_router = APIRouter()
 
 
-@router.get("/status", response_model=StatusResponse)
+# ---------------------------------------------------------------------------
+# Public endpoints
+# ---------------------------------------------------------------------------
+
+@public_router.get("/status", response_model=StatusResponse)
 async def read_status() -> StatusResponse:
     """Simple health check endpoint."""
     return StatusResponse(status="ok")
 
 
-@router.get("/balances/{account}")
+# ---------------------------------------------------------------------------
+# Protected endpoints
+# ---------------------------------------------------------------------------
+
+@protected_router.get("/balances/{account}")
 async def read_balance(account: str) -> Dict[str, float]:
     """Return the most recently cached balance for ``account``."""
     return await balance_service.get_balance(account)
 
 
-@router.put("/leader")
+@protected_router.put("/leader")
 async def configure_leader(config: LeaderConfig) -> Dict[str, bool]:
     """Persist leader credentials and start watching orders."""
 
@@ -52,15 +88,43 @@ async def configure_leader(config: LeaderConfig) -> Dict[str, bool]:
     return {"listening": True}
 
 
-@router.post("/copy/start")
+@protected_router.post("/copy/start")
 async def start_copy() -> Dict[str, bool]:
     """Enable order copying."""
     copy_dispatcher.start()
     return {"running": True}
 
 
-@router.post("/copy/stop")
+@protected_router.post("/copy/stop")
 async def stop_copy() -> Dict[str, bool]:
     """Disable order copying."""
     copy_dispatcher.stop()
     return {"running": False}
+
+
+# ---------------------------------------------------------------------------
+# Account management
+# ---------------------------------------------------------------------------
+
+
+class AccountStatusPayload(BaseModel):
+    """Payload for updating an account's status."""
+
+    status: AccountStatus
+
+
+@protected_router.get("/accounts")
+async def list_accounts() -> List[Dict[str, Any]]:
+    """Return all configured accounts."""
+    return [acc.to_dict() for acc in account_service.list_accounts()]
+
+
+@protected_router.put("/accounts/{name}/status")
+async def update_account_status(
+    name: str, payload: AccountStatusPayload
+) -> Dict[str, str]:
+    """Update the status of an account."""
+
+    account_service.update_account(name, status=payload.status)
+    return {"status": payload.status.value}
+
