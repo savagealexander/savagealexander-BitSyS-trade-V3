@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import asyncio
-import os
 from typing import Dict
 
+from .accounts import account_service
 from .connectors.binance import BinanceConnector
 from .connectors.bitget import BitgetConnector
 
@@ -25,28 +25,26 @@ class BalanceService:
             "binance": BinanceConnector,
             "bitget": BitgetConnector,
         }
-        # API credentials loaded from environment variables for simplicity
-        self._credentials = {
-            "binance": (
-                os.getenv("BINANCE_API_KEY", ""),
-                os.getenv("BINANCE_API_SECRET", ""),
-            ),
-            "bitget": (
-                os.getenv("BITGET_API_KEY", ""),
-                os.getenv("BITGET_API_SECRET", ""),
-            ),
-        }
         self._tasks: Dict[str, asyncio.Task] = {}
 
     async def update_balance(self, account_name: str) -> None:
         """Fetch and cache the latest balance for ``account_name``."""
-        connector_cls = self._connectors.get(account_name)
-        creds = self._credentials.get(account_name, ("", ""))
+
+        account = next(
+            (a for a in account_service.list_accounts() if a.name == account_name),
+            None,
+        )
+        if account is None:
+            return
+
+        connector_cls = self._connectors.get(account.exchange)
         if connector_cls is None:
             return
         try:
-            async with connector_cls() as connector:
-                balance = await connector.get_balance(*creds)
+            async with connector_cls(testnet=account.env == "test") as connector:
+                balance = await connector.get_balance(
+                    account.api_key, account.api_secret
+                )
             self._cache[account_name] = balance
         except Exception:
             # Errors are swallowed to keep polling alive
@@ -63,9 +61,11 @@ class BalanceService:
 
     async def start(self) -> None:
         """Start polling balances for all known accounts."""
-        for name in self._connectors.keys():
-            if name not in self._tasks:
-                self._tasks[name] = asyncio.create_task(self._poll(name))
+        for account in account_service.list_accounts():
+            if account.name not in self._tasks:
+                self._tasks[account.name] = asyncio.create_task(
+                    self._poll(account.name)
+                )
 
     async def get_balance(self, account_name: str) -> Dict[str, float]:
         """Return cached balance information for an account."""
