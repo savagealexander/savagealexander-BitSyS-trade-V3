@@ -28,6 +28,7 @@ class BinanceConnector:
             self.rest_base = "https://testnet.binance.vision"
             self.ws_base = "wss://testnet.binance.vision/ws"
         self._client = httpx.AsyncClient(base_url=self.rest_base)
+        self._ws = None
 
     async def get_time(self) -> Optional[int]:
         """Example REST call to fetch server time."""
@@ -67,7 +68,8 @@ class BinanceConnector:
     async def ws_connect(self, stream: str):
         """Return a websocket connection for a given stream."""
         url = f"{self.ws_base}/{stream}"
-        return await websockets.connect(url)
+        self._ws = await websockets.connect(url)
+        return self._ws
 
     async def create_listen_key(self, api_key: str) -> Optional[str]:
         """Create a userDataStream listen key."""
@@ -90,3 +92,16 @@ class BinanceConnector:
             )
         except Exception:
             pass
+
+    async def close(self) -> None:
+        """Close underlying HTTP and WebSocket connections."""
+        await self._client.aclose()
+        if self._ws is not None and not self._ws.closed:
+            await self._ws.close()
+        self._ws = None
+
+    async def __aenter__(self) -> "BinanceConnector":
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb) -> None:
+        await self.close()
