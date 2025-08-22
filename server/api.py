@@ -13,6 +13,7 @@ from .balances import balance_service
 from .copy_dispatcher import copy_dispatcher
 from .models import LeaderConfig, StatusResponse
 from .storage import save_leader_credentials
+from api.follower_accounts import router as follower_accounts_router
 
 
 # ---------------------------------------------------------------------------
@@ -127,4 +128,8 @@ async def update_account_status(
 
     account_service.update_account(name, status=payload.status)
     return {"status": payload.status.value}
+
+
+# Include follower account management routes
+protected_router.include_router(follower_accounts_router)
 
