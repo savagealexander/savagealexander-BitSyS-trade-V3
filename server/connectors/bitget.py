@@ -71,6 +71,20 @@ class BitgetConnector:
         self._ws = await websockets.connect(url)
         return self._ws
 
+    async def create_market_order(
+        self,
+        api_key: str,
+        api_secret: str,
+        side: str,
+        *,
+        quote_amount: float | None = None,
+        base_amount: float | None = None,
+        symbol: str = "BTCUSDT",
+    ) -> None:
+        """Place a market order (stub implementation)."""
+        _ = (api_key, api_secret, side, quote_amount, base_amount, symbol)
+        return None
+
     async def close(self) -> None:
         """Close underlying HTTP and WebSocket connections."""
         await self._client.aclose()
