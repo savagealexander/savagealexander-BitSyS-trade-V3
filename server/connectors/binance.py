@@ -68,3 +68,25 @@ class BinanceConnector:
         """Return a websocket connection for a given stream."""
         url = f"{self.ws_base}/{stream}"
         return await websockets.connect(url)
+
+    async def create_listen_key(self, api_key: str) -> Optional[str]:
+        """Create a userDataStream listen key."""
+        try:
+            resp = await self._client.post(
+                "/api/v3/userDataStream", headers={"X-MBX-APIKEY": api_key}
+            )
+            resp.raise_for_status()
+            return resp.json().get("listenKey")
+        except Exception:
+            return None
+
+    async def keepalive_listen_key(self, api_key: str, listen_key: str) -> None:
+        """Ping the listen key to keep the stream alive."""
+        try:
+            await self._client.put(
+                "/api/v3/userDataStream",
+                params={"listenKey": listen_key},
+                headers={"X-MBX-APIKEY": api_key},
+            )
+        except Exception:
+            pass
