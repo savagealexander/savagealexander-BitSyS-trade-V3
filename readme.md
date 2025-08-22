@@ -370,3 +370,13 @@ def on_leader_market_order(event):
             place_market_sell(acc, quantity=qty_i)
 
     mark_done(event.event_id)
+
+## 开发环境
+
+后端基于 Python 3.11+ 与 FastAPI 实现，`server` 目录包含主要模块。可用以下命令启动示例服务：
+
+```bash
+uvicorn server.main:app --reload
+```
+
+示例接口：访问 `GET /api/status` 可获取服务健康状态。
