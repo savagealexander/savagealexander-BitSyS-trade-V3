@@ -21,51 +21,50 @@ async def watch_leader_orders(
     message is received for ``WS_HEARTBEAT_SEC`` seconds.
     """
 
-    connector = BinanceConnector(testnet=testnet)
+    async with BinanceConnector(testnet=testnet) as connector:
+        while True:
+            listen_key = await connector.create_listen_key(api_key)
+            if not listen_key:
+                await asyncio.sleep(WS_HEARTBEAT_SEC)
+                continue
 
-    while True:
-        listen_key = await connector.create_listen_key(api_key)
-        if not listen_key:
-            await asyncio.sleep(WS_HEARTBEAT_SEC)
-            continue
+            free_usdt = 0.0
+            free_btc = 0.0
 
-        free_usdt = 0.0
-        free_btc = 0.0
+            try:
+                async with connector.ws_connect(listen_key) as ws:
+                    while True:
+                        try:
+                            raw = await asyncio.wait_for(
+                                ws.recv(), timeout=WS_HEARTBEAT_SEC
+                            )
+                        except asyncio.TimeoutError:
+                            await ws.ping()
+                            continue
 
-        try:
-            async with connector.ws_connect(listen_key) as ws:
-                while True:
-                    try:
-                        raw = await asyncio.wait_for(
-                            ws.recv(), timeout=WS_HEARTBEAT_SEC
-                        )
-                    except asyncio.TimeoutError:
-                        await ws.ping()
-                        continue
+                        data = json.loads(raw)
+                        etype = data.get("e")
 
-                    data = json.loads(raw)
-                    etype = data.get("e")
+                        if etype == "outboundAccountPosition":
+                            balances = {b["a"]: float(b["f"]) for b in data.get("B", [])}
+                            free_usdt = balances.get("USDT", free_usdt)
+                            free_btc = balances.get("BTC", free_btc)
+                            continue
 
-                    if etype == "outboundAccountPosition":
-                        balances = {b["a"]: float(b["f"]) for b in data.get("B", [])}
-                        free_usdt = balances.get("USDT", free_usdt)
-                        free_btc = balances.get("BTC", free_btc)
-                        continue
+                        if etype != "executionReport":
+                            continue
 
-                    if etype != "executionReport":
-                        continue
+                        if data.get("X") != "FILLED" or data.get("o") != "MARKET":
+                            continue
 
-                    if data.get("X") != "FILLED" or data.get("o") != "MARKET":
-                        continue
-
-                    yield {
-                        "event_id": data.get("i"),
-                        "side": data.get("S"),
-                        "quote_filled": float(data.get("Z", 0.0)),
-                        "base_filled": float(data.get("z", 0.0)),
-                        "leader_free_usdt": free_usdt,
-                        "leader_free_btc": free_btc,
-                    }
-        except Exception:
-            await asyncio.sleep(WS_HEARTBEAT_SEC)
-            continue
+                        yield {
+                            "event_id": data.get("i"),
+                            "side": data.get("S"),
+                            "quote_filled": float(data.get("Z", 0.0)),
+                            "base_filled": float(data.get("z", 0.0)),
+                            "leader_free_usdt": free_usdt,
+                            "leader_free_btc": free_btc,
+                        }
+            except Exception:
+                await asyncio.sleep(WS_HEARTBEAT_SEC)
+                continue

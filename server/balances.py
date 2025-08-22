@@ -22,8 +22,8 @@ class BalanceService:
         self._cache: Dict[str, Dict[str, float]] = {}
         self._poll_interval = poll_interval
         self._connectors = {
-            "binance": BinanceConnector(),
-            "bitget": BitgetConnector(),
+            "binance": BinanceConnector,
+            "bitget": BitgetConnector,
         }
         # API credentials loaded from environment variables for simplicity
         self._credentials = {
@@ -40,12 +40,13 @@ class BalanceService:
 
     async def update_balance(self, account_name: str) -> None:
         """Fetch and cache the latest balance for ``account_name``."""
-        connector = self._connectors.get(account_name)
+        connector_cls = self._connectors.get(account_name)
         creds = self._credentials.get(account_name, ("", ""))
-        if connector is None:
+        if connector_cls is None:
             return
         try:
-            balance = await connector.get_balance(*creds)
+            async with connector_cls() as connector:
+                balance = await connector.get_balance(*creds)
             self._cache[account_name] = balance
         except Exception:
             # Errors are swallowed to keep polling alive
