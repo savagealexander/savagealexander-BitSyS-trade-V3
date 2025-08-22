@@ -6,6 +6,7 @@ from typing import Dict, Optional
 import hmac
 import time
 from hashlib import sha256
+import json
 
 import httpx
 import websockets
@@ -80,10 +81,45 @@ class BitgetConnector:
         quote_amount: float | None = None,
         base_amount: float | None = None,
         symbol: str = "BTCUSDT",
-    ) -> None:
-        """Place a market order (stub implementation)."""
-        _ = (api_key, api_secret, side, quote_amount, base_amount, symbol)
-        return None
+    ) -> Dict:
+        """Place a market order on Bitget.
+
+        The Bitget REST API expects different fields for BUY and SELL orders:
+        ``notional`` (a USDT amount) for buys and ``quantity`` (BTC amount)
+        for sells. Errors will raise ``httpx.HTTPStatusError`` so callers can
+        surface meaningful messages to users.
+        """
+
+        ts = str(int(time.time() * 1000))
+        path = "/api/spot/v1/trade/orders"
+        body: Dict[str, str] = {
+            "symbol": symbol,
+            "side": side.lower(),
+            "type": "market",
+        }
+
+        if side.upper() == "BUY":
+            if quote_amount is None:
+                raise ValueError("quote_amount required for BUY orders")
+            body["notional"] = str(quote_amount)
+        else:
+            if base_amount is None:
+                raise ValueError("base_amount required for SELL orders")
+            body["quantity"] = str(base_amount)
+
+        body_str = json.dumps(body)
+        prehash = f"{ts}POST{path}{body_str}"
+        sign = hmac.new(api_secret.encode(), prehash.encode(), sha256).hexdigest()
+        headers = {
+            "ACCESS-KEY": api_key,
+            "ACCESS-SIGN": sign,
+            "ACCESS-TIMESTAMP": ts,
+            "Content-Type": "application/json",
+        }
+
+        resp = await self._client.post(path, headers=headers, content=body_str)
+        resp.raise_for_status()
+        return resp.json()
 
     async def close(self) -> None:
         """Close underlying HTTP and WebSocket connections."""

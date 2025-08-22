@@ -80,10 +80,40 @@ class BinanceConnector:
         quote_amount: float | None = None,
         base_amount: float | None = None,
         symbol: str = "BTCUSDT",
-    ) -> None:
-        """Place a market order (stub implementation)."""
-        _ = (api_key, api_secret, side, quote_amount, base_amount, symbol)
-        return None
+    ) -> Dict:
+        """Place a market order on Binance.
+
+        Depending on ``side`` the order uses either ``quote_amount`` (for
+        BUY orders) or ``base_amount`` (for SELL orders). Errors from the
+        exchange are propagated as ``httpx.HTTPStatusError`` allowing callers
+        to capture the failure reason.
+        """
+
+        timestamp = int(time.time() * 1000)
+        params: Dict[str, str] = {
+            "symbol": symbol,
+            "side": side,
+            "type": "MARKET",
+            "timestamp": str(timestamp),
+        }
+
+        if side.upper() == "BUY":
+            if quote_amount is None:
+                raise ValueError("quote_amount required for BUY orders")
+            params["quoteOrderQty"] = str(quote_amount)
+        else:
+            if base_amount is None:
+                raise ValueError("base_amount required for SELL orders")
+            params["quantity"] = str(base_amount)
+
+        query = urlencode(params)
+        signature = hmac.new(api_secret.encode(), query.encode(), sha256).hexdigest()
+        headers = {"X-MBX-APIKEY": api_key}
+        url = f"/api/v3/order?{query}&signature={signature}"
+
+        resp = await self._client.post(url, headers=headers)
+        resp.raise_for_status()
+        return resp.json()
 
     async def create_listen_key(self, api_key: str) -> Optional[str]:
         """Create a userDataStream listen key."""
