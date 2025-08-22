@@ -50,3 +50,17 @@ async def configure_leader(config: LeaderConfig) -> Dict[str, bool]:
             pass
     _leader_task = asyncio.create_task(_run_leader_watcher(config))
     return {"listening": True}
+
+
+@router.post("/copy/start")
+async def start_copy() -> Dict[str, bool]:
+    """Enable order copying."""
+    copy_dispatcher.start()
+    return {"running": True}
+
+
+@router.post("/copy/stop")
+async def stop_copy() -> Dict[str, bool]:
+    """Disable order copying."""
+    copy_dispatcher.stop()
+    return {"running": False}

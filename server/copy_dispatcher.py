@@ -24,9 +24,31 @@ class CopyDispatcher:
             "binance": BinanceConnector,
             "bitget": BitgetConnector,
         }
+        self._enabled: bool = True
+        # Store per-account results for UI consumption
+        self._last_results: dict[str, dict] = {}
+
+    def start(self) -> None:
+        self._enabled = True
+
+    def stop(self) -> None:
+        self._enabled = False
+
+    def is_running(self) -> bool:
+        return self._enabled
+
+    def get_last_results(self) -> dict[str, dict]:
+        return self._last_results
 
     async def dispatch(self, order_event: dict) -> None:
-        """Dispatch an order event to all followers."""
+        """Dispatch an order event to all followers.
+
+        Real order results are recorded and any failures are captured so the UI
+        can surface them to the user.
+        """
+        if not self._enabled:
+            return
+
         event_id = order_event.get("event_id")
         side = order_event.get("side")
         leader_quote = float(order_event.get("quote_filled", 0.0))
@@ -52,14 +74,14 @@ class CopyDispatcher:
             try:
                 async with connector_cls(testnet=account.env == "test") as connector:
                     if side == "BUY":
-                        await connector.create_market_order(
+                        result = await connector.create_market_order(
                             account.api_key,
                             account.api_secret,
                             side,
                             quote_amount=quote_amt,
                         )
                     else:
-                        await connector.create_market_order(
+                        result = await connector.create_market_order(
                             account.api_key,
                             account.api_secret,
                             side,
@@ -67,7 +89,16 @@ class CopyDispatcher:
                         )
                 self._balances.trigger_update(account.name)
                 self._idem.mark_processed(key)
-            except Exception:
+                self._last_results[account.name] = {"success": True, "data": result}
+            except Exception as exc:
+                # Record failure reason for UI display
+                reason = str(exc)
+                if hasattr(exc, "response"):
+                    try:
+                        reason = exc.response.text
+                    except Exception:
+                        pass
+                self._last_results[account.name] = {"success": False, "error": reason}
                 continue
 
 
