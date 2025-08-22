@@ -4,6 +4,7 @@ import asyncio
 from fastapi import APIRouter
 
 from .balances import balance_service
+from .copy_dispatcher import copy_dispatcher
 from .models import LeaderConfig, StatusResponse
 from .storage import save_leader_credentials
 from . import leader_watcher
@@ -14,10 +15,10 @@ _leader_task: asyncio.Task | None = None
 
 
 async def _run_leader_watcher(cfg: LeaderConfig) -> None:
-    async for _ in leader_watcher.watch_leader_orders(
+    async for event in leader_watcher.watch_leader_orders(
         cfg.api_key, testnet=cfg.env == "test"
     ):
-        pass
+        await copy_dispatcher.dispatch(event)
 
 router = APIRouter()
 
