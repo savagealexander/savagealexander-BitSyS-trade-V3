@@ -26,6 +26,7 @@ class Account:
     env: str
     api_key: str
     api_secret: str
+    passphrase: str | None = None
     status: AccountStatus = AccountStatus.ACTIVE
 
     def to_dict(self) -> Dict[str, Any]:

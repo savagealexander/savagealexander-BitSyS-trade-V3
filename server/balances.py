@@ -47,9 +47,14 @@ class BalanceService:
             return
         try:
             async with connector_cls(testnet=account.env == "test") as connector:
-                balance = await connector.get_balance(
-                    account.api_key, account.api_secret
-                )
+                if account.exchange == "bitget":
+                    balance = await connector.get_balance(
+                        account.api_key, account.api_secret, account.passphrase or ""
+                    )
+                else:
+                    balance = await connector.get_balance(
+                        account.api_key, account.api_secret
+                    )
             self._cache[account_name] = balance
         except Exception:
             # Errors are swallowed to keep polling alive

@@ -20,6 +20,7 @@ class AccountPayload(BaseModel):
     env: str = Field(..., min_length=1)
     api_key: str = Field(..., min_length=1)
     api_secret: str = Field(..., min_length=1)
+    passphrase: str | None = Field(default=None, min_length=1)
 
 
 class CredentialsPayload(BaseModel):
@@ -29,6 +30,7 @@ class CredentialsPayload(BaseModel):
     env: str = Field(..., min_length=1)
     api_key: str = Field(..., min_length=1)
     api_secret: str = Field(..., min_length=1)
+    passphrase: str | None = Field(default=None, min_length=1)
 
 
 @router.post("", response_model=Dict[str, str])
@@ -37,6 +39,9 @@ async def create_follower_account(payload: AccountPayload) -> Dict[str, str]:
 
     if any(a.name == payload.name for a in account_service.list_accounts()):
         raise HTTPException(status_code=400, detail="account already exists")
+
+    if payload.exchange.lower() == "bitget" and not payload.passphrase:
+        raise HTTPException(status_code=400, detail="passphrase required")
 
     account = Account(**payload.model_dump())
     account_service.add_account(account)
@@ -57,8 +62,13 @@ async def delete_follower_account(name: str) -> Dict[str, bool]:
 async def verify_account_credentials(payload: CredentialsPayload) -> Dict[str, bool]:
     """Validate account credentials without storing them."""
 
+    require_pp = payload.exchange.lower() == "bitget"
     valid = bool(
-        payload.exchange and payload.env and payload.api_key and payload.api_secret
+        payload.exchange
+        and payload.env
+        and payload.api_key
+        and payload.api_secret
+        and (payload.passphrase if require_pp else True)
     )
     if not valid:
         raise HTTPException(status_code=400, detail="invalid credentials")
