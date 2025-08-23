@@ -59,6 +59,13 @@ class AccountService:
         self._validate(account)
         self._accounts[account.name] = account
         self._persist()
+        try:
+            from .balances import balance_service
+
+            balance_service.register_account(account.name)
+        except Exception:
+            # In contexts without an event loop or balance service, ignore
+            pass
 
     def update_account(self, name: str, **updates: Any) -> None:
         """Update fields for an existing account."""
