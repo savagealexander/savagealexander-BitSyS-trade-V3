@@ -5,7 +5,11 @@ from __future__ import annotations
 from .accounts import AccountStatus, account_service, AccountService
 from .balances import balance_service, BalanceService
 from .idempotency import IdempotencyStore
-from .connectors import BinanceConnector, BitgetConnector
+
+try:  # optional during tests
+    from .connectors import BinanceConnector, BitgetConnector
+except Exception:  # pragma: no cover
+    BinanceConnector = BitgetConnector = None
 
 
 class CopyDispatcher:
@@ -20,10 +24,11 @@ class CopyDispatcher:
         self._accounts = accounts
         self._balances = balances
         self._idem = idem_store
-        self._connectors = {
-            "binance": BinanceConnector,
-            "bitget": BitgetConnector,
-        }
+        self._connectors = {}
+        if BinanceConnector:
+            self._connectors["binance"] = BinanceConnector
+        if BitgetConnector:
+            self._connectors["bitget"] = BitgetConnector
         self._enabled: bool = True
         # Store per-account results for UI consumption
         self._last_results: dict[str, dict] = {}

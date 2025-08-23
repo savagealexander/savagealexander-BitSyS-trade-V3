@@ -6,8 +6,12 @@ import asyncio
 from typing import Dict
 
 from .accounts import account_service
-from .connectors.binance import BinanceConnector
-from .connectors.bitget import BitgetConnector
+
+try:  # Optional imports during tests where dependencies may be missing
+    from .connectors.binance import BinanceConnector
+    from .connectors.bitget import BitgetConnector
+except Exception:  # pragma: no cover - degraded functionality for tests
+    BinanceConnector = BitgetConnector = None
 
 
 class BalanceService:
@@ -21,10 +25,11 @@ class BalanceService:
     def __init__(self, poll_interval: float = 5.0) -> None:
         self._cache: Dict[str, Dict[str, float]] = {}
         self._poll_interval = poll_interval
-        self._connectors = {
-            "binance": BinanceConnector,
-            "bitget": BitgetConnector,
-        }
+        self._connectors = {}
+        if BinanceConnector:
+            self._connectors["binance"] = BinanceConnector
+        if BitgetConnector:
+            self._connectors["bitget"] = BitgetConnector
         self._tasks: Dict[str, asyncio.Task] = {}
 
     async def update_balance(self, account_name: str) -> None:

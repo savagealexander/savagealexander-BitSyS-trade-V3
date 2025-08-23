@@ -7,7 +7,6 @@ from typing import Any, Dict, List
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel
 
-from . import leader_watcher
 from .accounts import AccountStatus, account_service
 from .balances import balance_service
 from .copy_dispatcher import copy_dispatcher
@@ -41,6 +40,8 @@ _leader_task: asyncio.Task | None = None
 
 
 async def _run_leader_watcher(cfg: LeaderConfig) -> None:
+    from . import leader_watcher
+
     async for event in leader_watcher.watch_leader_orders(
         cfg.api_key, testnet=cfg.env == "test"
     ):
