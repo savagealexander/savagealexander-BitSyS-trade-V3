@@ -5,9 +5,10 @@ import {
   setLeader,
   listAccounts,
   createFollowerAccount,
-  deleteFollowerAccount,
   verifyFollowerAccount,
-  getBalance
+  getBalance,
+  getCopyResults,
+  updateAccountStatus
 } from './api';
 
 const statusEl = document.getElementById('status')!;
@@ -16,7 +17,7 @@ const saveLeaderBtn = document.getElementById('saveLeader') as HTMLButtonElement
 const startBtn = document.getElementById('startBtn') as HTMLButtonElement;
 const stopBtn = document.getElementById('stopBtn') as HTMLButtonElement;
 
-const accountsList = document.getElementById('accountsList')!;
+const accountsBody = document.getElementById('accountsTableBody')!;
 const accName = document.getElementById('accName') as HTMLInputElement;
 const accExchange = document.getElementById('accExchange') as HTMLSelectElement;
 const accEnv = document.getElementById('accEnv') as HTMLSelectElement;
@@ -56,46 +57,91 @@ function validatePayload(payload: any, requireName = false) {
   return true;
 }
 
+interface AccountRow {
+  statusEl: HTMLElement;
+  usdtEl: HTMLElement;
+  btcEl: HTMLElement;
+  resultEl: HTMLElement;
+  errorEl: HTMLElement;
+  actionBtn: HTMLButtonElement;
+}
+
+const accountRows: Record<string, AccountRow> = {};
+let accounts: any[] = [];
+
 async function loadAccounts() {
   try {
-    const accounts = await listAccounts();
-    accountsList.innerHTML = '';
+    accounts = await listAccounts();
+    accountsBody.innerHTML = '';
+    Object.keys(accountRows).forEach((k) => delete accountRows[k]);
     accounts.forEach((acc: any) => {
-      const li = document.createElement('li');
-      li.textContent = `${acc.name} (${acc.exchange}) `;
-
-      const verifyBtn = document.createElement('button');
-      verifyBtn.textContent = 'Verify';
-      verifyBtn.addEventListener('click', async () => {
-        const res = await verifyFollowerAccount({
-          exchange: acc.exchange,
-          env: acc.env,
-          api_key: acc.api_key,
-          api_secret: acc.api_secret,
-          passphrase: acc.passphrase
-        });
-        alert(res.valid ? 'Valid' : `Invalid: ${res.error || ''}`);
-      });
-
-      const delBtn = document.createElement('button');
-      delBtn.textContent = 'Delete';
-      delBtn.addEventListener('click', async () => {
-        if (confirm(`Delete ${acc.name}?`)) {
-          await deleteFollowerAccount(acc.name);
-          loadAccounts();
-        }
-      });
-
-      li.appendChild(verifyBtn);
-      li.appendChild(delBtn);
-      accountsList.appendChild(li);
+      const tr = document.createElement('tr');
+      const nameTd = document.createElement('td');
+      nameTd.textContent = acc.name;
+      const exTd = document.createElement('td');
+      exTd.textContent = acc.exchange;
+      const envTd = document.createElement('td');
+      envTd.textContent = acc.env;
+      const statusTd = document.createElement('td');
+      statusTd.textContent = acc.status;
+      const usdtTd = document.createElement('td');
+      usdtTd.textContent = '-';
+      const btcTd = document.createElement('td');
+      btcTd.textContent = '-';
+      const resultTd = document.createElement('td');
+      resultTd.textContent = '-';
+      const errorTd = document.createElement('td');
+      errorTd.textContent = '';
+      const actionTd = document.createElement('td');
+      const actionBtn = document.createElement('button');
+      actionBtn.textContent =
+        acc.status === 'active' ? 'Pause' : 'Resume';
+      actionBtn.addEventListener('click', () => toggleAccount(acc.name));
+      actionTd.appendChild(actionBtn);
+      tr.append(
+        nameTd,
+        exTd,
+        envTd,
+        statusTd,
+        usdtTd,
+        btcTd,
+        resultTd,
+        errorTd,
+        actionTd
+      );
+      accountsBody.appendChild(tr);
+      accountRows[acc.name] = {
+        statusEl: statusTd,
+        usdtEl: usdtTd,
+        btcEl: btcTd,
+        resultEl: resultTd,
+        errorEl: errorTd,
+        actionBtn
+      };
     });
   } catch (e) {
-    accountsList.innerHTML = 'Error';
+    accountsBody.innerHTML =
+      '<tr><td colspan="9">Error loading accounts</td></tr>';
   }
 }
 
-async function refresh() {
+async function toggleAccount(name: string) {
+  const row = accountRows[name];
+  const acc = accounts.find((a) => a.name === name);
+  const target = acc.status === 'active' ? 'paused' : 'active';
+  try {
+    await updateAccountStatus(name, target);
+    acc.status = target;
+    row.statusEl.textContent = target;
+    row.actionBtn.textContent = target === 'active' ? 'Pause' : 'Resume';
+    row.errorEl.textContent = '';
+  } catch (err: any) {
+    const msg = err?.response?.data?.detail || err.message;
+    row.errorEl.textContent = msg;
+  }
+}
+
+async function refreshGlobal() {
   try {
     const data = await getStatus();
     statusEl.textContent = data.running ? 'Running' : 'Stopped';
@@ -107,19 +153,57 @@ async function refresh() {
   }
 }
 
+async function updateBalances() {
+  await Promise.all(
+    accounts.map(async (acc: any) => {
+      try {
+        const bal = await getBalance(acc.name);
+        const row = accountRows[acc.name];
+        row.usdtEl.textContent = (bal.USDT ?? 0).toFixed(2);
+        row.btcEl.textContent = (bal.BTC ?? 0).toFixed(6);
+      } catch (e) {
+        const row = accountRows[acc.name];
+        row.usdtEl.textContent = 'Err';
+        row.btcEl.textContent = 'Err';
+      }
+    })
+  );
+}
+
+async function updateResults() {
+  try {
+    const results = await getCopyResults();
+    Object.keys(accountRows).forEach((name) => {
+      const row = accountRows[name];
+      const r = results[name];
+      if (r) {
+        row.resultEl.textContent = r.success ? 'Success' : 'Fail';
+        row.errorEl.textContent = r.success ? '' : r.error || '';
+      }
+    });
+  } catch (e) {
+    // ignore
+  }
+}
+
+setInterval(() => {
+  updateBalances();
+  updateResults();
+}, 5000);
+
 startBtn.addEventListener('click', async () => {
   await startCopy();
-  refresh();
+  refreshGlobal();
 });
 
 stopBtn.addEventListener('click', async () => {
   await stopCopy();
-  refresh();
+  refreshGlobal();
 });
 
 saveLeaderBtn.addEventListener('click', async () => {
   await setLeader(leaderInput.value);
-  refresh();
+  refreshGlobal();
 });
 
 verifyAccBtn.addEventListener('click', async () => {
@@ -139,16 +223,13 @@ addAccBtn.addEventListener('click', async () => {
     return;
   }
   await createFollowerAccount(payload);
-  const balance = await getBalance(payload.name);
-  if (
-    !balance ||
-    Object.keys(balance).length === 0 ||
-    Object.values(balance).every((v: any) => v === 0)
-  ) {
-    alert('Account added but balance not available yet. Please refresh later.');
-  }
-  loadAccounts();
+  await loadAccounts();
+  updateBalances();
+  updateResults();
 });
 
-refresh();
-loadAccounts();
+refreshGlobal();
+loadAccounts().then(() => {
+  updateBalances();
+  updateResults();
+});
