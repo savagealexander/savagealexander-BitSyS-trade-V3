@@ -18,8 +18,15 @@ export async function getCopyStatus(): Promise<CopyStatus> {
   return res.data;
 }
 
-export async function setLeader(leader: string) {
-  const res = await client.put('/leader', { leader });
+export interface LeaderConfig {
+  exchange: string;
+  env: string;
+  api_key: string;
+  api_secret: string;
+}
+
+export async function setLeader(cfg: LeaderConfig) {
+  const res = await client.put('/leader', cfg);
   return res.data;
 }
 
