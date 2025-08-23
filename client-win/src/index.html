@@ -15,8 +15,23 @@
       <button id="startBtn">Start</button>
       <button id="stopBtn">Stop</button>
     </div>
-    <h2>Follower Accounts</h2>
-    <ul id="accountsList"></ul>
+    <h2>Accounts</h2>
+    <table id="accountsTable" border="1">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Exchange</th>
+          <th>Env</th>
+          <th>Status</th>
+          <th>USDT</th>
+          <th>BTC</th>
+          <th>Last Result</th>
+          <th>Error</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="accountsTableBody"></tbody>
+    </table>
     <h3>Add Account</h3>
     <div id="addAccountForm">
       Name: <input id="accName" type="text" />

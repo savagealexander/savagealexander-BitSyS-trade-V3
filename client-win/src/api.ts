@@ -73,3 +73,16 @@ export async function getBalance(account: string) {
   const res = await client.get(`/balances/${encodeURIComponent(account)}`);
   return res.data;
 }
+
+export async function getCopyResults() {
+  const res = await client.get('/copy/results');
+  return res.data;
+}
+
+export async function updateAccountStatus(name: string, status: string) {
+  const res = await client.put(
+    `/accounts/${encodeURIComponent(name)}/status`,
+    { status }
+  );
+  return res.data;
+}
