@@ -29,6 +29,8 @@ def _get_client(tmp_path):
 
 def test_create_and_delete_follower_account(tmp_path):
     client = _get_client(tmp_path)
+    import services.follower_account_service as fas
+    fas.verify_credentials = AsyncMock(return_value=(True, ""))
     payload = {
         "name": "acc1",
         "exchange": "binance",
@@ -48,6 +50,8 @@ def test_create_and_delete_follower_account(tmp_path):
 
 def test_create_duplicate_account_fails(tmp_path):
     client = _get_client(tmp_path)
+    import services.follower_account_service as fas
+    fas.verify_credentials = AsyncMock(return_value=(True, ""))
     payload = {
         "name": "acc1",
         "exchange": "binance",
@@ -93,6 +97,8 @@ def test_verify_credentials(tmp_path):
 
 def test_bitget_requires_passphrase(tmp_path):
     client = _get_client(tmp_path)
+    import services.follower_account_service as fas
+    fas.verify_credentials = AsyncMock(return_value=(True, ""))
 
     payload = {
         "name": "acc1",
@@ -127,3 +133,25 @@ def test_bitget_requires_passphrase(tmp_path):
     verify_missing.pop("passphrase")
     resp = client.post("/api/follower-accounts/verify", json=verify_missing)
     assert resp.status_code == 400
+
+
+def test_create_rejects_invalid_credentials(tmp_path):
+    client = _get_client(tmp_path)
+    import services.follower_account_service as fas
+    payload = {
+        "name": "acc1",
+        "exchange": "binance",
+        "env": "test",
+        "api_key": "key",
+        "api_secret": "secret",
+    }
+
+    fas.verify_credentials = AsyncMock(return_value=(False, "boom"))
+    resp = client.post("/api/follower-accounts", json=payload)
+    assert resp.status_code == 400
+    assert resp.json() == {"detail": "boom"}
+
+    fas.verify_credentials = AsyncMock(return_value=(True, ""))
+    resp = client.post("/api/follower-accounts", json=payload)
+    assert resp.status_code == 200
+    assert resp.json() == {"name": "acc1"}
