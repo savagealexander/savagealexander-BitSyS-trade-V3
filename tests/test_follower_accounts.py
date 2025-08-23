@@ -1,5 +1,7 @@
 import importlib
 import os
+from unittest.mock import AsyncMock
+
 from fastapi.testclient import TestClient
 
 
@@ -60,15 +62,24 @@ def test_create_duplicate_account_fails(tmp_path):
 
 def test_verify_credentials(tmp_path):
     client = _get_client(tmp_path)
+    import services.follower_account_service as fas
+
     valid_payload = {
         "exchange": "binance",
         "env": "test",
         "api_key": "key",
         "api_secret": "secret",
     }
+
+    fas.verify_credentials = AsyncMock(return_value=(True, ""))
     resp = client.post("/api/follower-accounts/verify", json=valid_payload)
     assert resp.status_code == 200
-    assert resp.json()["valid"] is True
+    assert resp.json() == {"valid": True, "error": ""}
+
+    fas.verify_credentials = AsyncMock(return_value=(False, "boom"))
+    resp = client.post("/api/follower-accounts/verify", json=valid_payload)
+    assert resp.status_code == 200
+    assert resp.json() == {"valid": False, "error": "boom"}
 
     invalid_payload = {
         "exchange": "binance",
@@ -107,6 +118,8 @@ def test_bitget_requires_passphrase(tmp_path):
         "api_secret": "secret",
         "passphrase": "pp",
     }
+    import services.follower_account_service as fas
+    fas.verify_credentials = AsyncMock(return_value=(True, ""))
     resp = client.post("/api/follower-accounts/verify", json=verify_payload)
     assert resp.status_code == 200
 
