@@ -78,3 +78,39 @@ def test_verify_credentials(tmp_path):
     }
     resp = client.post("/api/follower-accounts/verify", json=invalid_payload)
     assert resp.status_code == 400
+
+
+def test_bitget_requires_passphrase(tmp_path):
+    client = _get_client(tmp_path)
+
+    payload = {
+        "name": "acc1",
+        "exchange": "bitget",
+        "env": "test",
+        "api_key": "key1",
+        "api_secret": "secret1",
+        "passphrase": "pp1",
+    }
+    resp = client.post("/api/follower-accounts", json=payload)
+    assert resp.status_code == 200
+
+    missing_pp = payload.copy()
+    missing_pp["name"] = "acc2"
+    missing_pp.pop("passphrase")
+    resp = client.post("/api/follower-accounts", json=missing_pp)
+    assert resp.status_code == 400
+
+    verify_payload = {
+        "exchange": "bitget",
+        "env": "test",
+        "api_key": "key",
+        "api_secret": "secret",
+        "passphrase": "pp",
+    }
+    resp = client.post("/api/follower-accounts/verify", json=verify_payload)
+    assert resp.status_code == 200
+
+    verify_missing = verify_payload.copy()
+    verify_missing.pop("passphrase")
+    resp = client.post("/api/follower-accounts/verify", json=verify_missing)
+    assert resp.status_code == 400

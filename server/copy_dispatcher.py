@@ -79,19 +79,37 @@ class CopyDispatcher:
             try:
                 async with connector_cls(testnet=account.env == "test") as connector:
                     if side == "BUY":
-                        result = await connector.create_market_order(
-                            account.api_key,
-                            account.api_secret,
-                            side,
-                            quote_amount=quote_amt,
-                        )
+                        if account.exchange == "bitget":
+                            result = await connector.create_market_order(
+                                account.api_key,
+                                account.api_secret,
+                                account.passphrase or "",
+                                side,
+                                quote_amount=quote_amt,
+                            )
+                        else:
+                            result = await connector.create_market_order(
+                                account.api_key,
+                                account.api_secret,
+                                side,
+                                quote_amount=quote_amt,
+                            )
                     else:
-                        result = await connector.create_market_order(
-                            account.api_key,
-                            account.api_secret,
-                            side,
-                            base_amount=base_amt,
-                        )
+                        if account.exchange == "bitget":
+                            result = await connector.create_market_order(
+                                account.api_key,
+                                account.api_secret,
+                                account.passphrase or "",
+                                side,
+                                base_amount=base_amt,
+                            )
+                        else:
+                            result = await connector.create_market_order(
+                                account.api_key,
+                                account.api_secret,
+                                side,
+                                base_amount=base_amt,
+                            )
                 self._balances.trigger_update(account.name)
                 self._idem.mark_processed(key)
                 self._last_results[account.name] = {"success": True, "data": result}
