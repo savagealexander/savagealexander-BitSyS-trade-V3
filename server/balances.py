@@ -64,6 +64,13 @@ class BalanceService:
         """Trigger an asynchronous balance refresh for ``account_name``."""
         asyncio.create_task(self.update_balance(account_name))
 
+    def register_account(self, account_name: str) -> None:
+        """Begin polling balances for ``account_name`` if not already running."""
+        if account_name not in self._tasks:
+            self._tasks[account_name] = asyncio.create_task(self._poll(account_name))
+            # Populate initial balance data immediately
+            self.trigger_update(account_name)
+
     async def _poll(self, account_name: str) -> None:
         while True:
             await self.update_balance(account_name)
@@ -72,10 +79,7 @@ class BalanceService:
     async def start(self) -> None:
         """Start polling balances for all known accounts."""
         for account in account_service.list_accounts():
-            if account.name not in self._tasks:
-                self._tasks[account.name] = asyncio.create_task(
-                    self._poll(account.name)
-                )
+            self.register_account(account.name)
 
     async def get_balance(self, account_name: str) -> Dict[str, float]:
         """Return cached balance information for an account."""
