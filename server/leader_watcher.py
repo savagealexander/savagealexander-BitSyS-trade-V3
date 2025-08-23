@@ -32,7 +32,8 @@ async def watch_leader_orders(
             free_btc = 0.0
 
             try:
-                async with connector.ws_connect(listen_key) as ws:
+                ws = await connector.ws_connect(listen_key)
+                try:
                     while True:
                         try:
                             raw = await asyncio.wait_for(
@@ -65,6 +66,8 @@ async def watch_leader_orders(
                             "leader_free_usdt": free_usdt,
                             "leader_free_btc": free_btc,
                         }
+                finally:
+                    await ws.close()
             except Exception:
                 await asyncio.sleep(WS_HEARTBEAT_SEC)
                 continue
