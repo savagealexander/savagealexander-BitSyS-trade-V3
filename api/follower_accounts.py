@@ -50,6 +50,15 @@ async def create_follower_account(payload: AccountPayload) -> Dict[str, str]:
 
     if payload.exchange.lower() == "bitget" and not payload.passphrase:
         raise HTTPException(status_code=400, detail="passphrase required")
+    valid, error = await follower_account_service.verify_credentials(
+        exchange=payload.exchange,
+        env=payload.env,
+        api_key=payload.api_key,
+        api_secret=payload.api_secret,
+        passphrase=payload.passphrase,
+    )
+    if not valid:
+        raise HTTPException(status_code=400, detail=error)
 
     account = Account(**payload.model_dump())
     account_service.add_account(account)
