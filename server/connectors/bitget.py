@@ -37,7 +37,7 @@ class BitgetConnector:
         except Exception:
             return None
 
-    async def get_balance(self, api_key: str, api_secret: str) -> Dict[str, float]:
+    async def get_balance(self, api_key: str, api_secret: str, passphrase: str) -> Dict[str, float]:
         """Return available BTC and USDT balances.
 
         Uses the ``/api/spot/v1/account/assets`` endpoint which requires a
@@ -53,6 +53,7 @@ class BitgetConnector:
                 "ACCESS-KEY": api_key,
                 "ACCESS-SIGN": sign,
                 "ACCESS-TIMESTAMP": ts,
+                "ACCESS-PASSPHRASE": passphrase,
             }
             resp = await self._client.get(path, headers=headers)
             resp.raise_for_status()
@@ -76,6 +77,7 @@ class BitgetConnector:
         self,
         api_key: str,
         api_secret: str,
+        passphrase: str,
         side: str,
         *,
         quote_amount: float | None = None,
@@ -114,6 +116,7 @@ class BitgetConnector:
             "ACCESS-KEY": api_key,
             "ACCESS-SIGN": sign,
             "ACCESS-TIMESTAMP": ts,
+            "ACCESS-PASSPHRASE": passphrase,
             "Content-Type": "application/json",
         }
 

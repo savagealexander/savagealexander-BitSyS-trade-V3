@@ -104,6 +104,12 @@ async def stop_copy() -> Dict[str, bool]:
     return {"running": False}
 
 
+@protected_router.get("/copy/results")
+async def get_copy_results() -> Dict[str, Dict[str, Any]]:
+    """Return the results of the most recent copy trade dispatch."""
+    return copy_dispatcher.get_last_results()
+
+
 # ---------------------------------------------------------------------------
 # Account management
 # ---------------------------------------------------------------------------

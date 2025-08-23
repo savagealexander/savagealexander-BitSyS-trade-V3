@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Copy Trader</title>
+  </head>
+  <body>
+    <h1>Copy Trading Client</h1>
+    <div>Status: <span id="status">Unknown</span></div>
+    <div>
+      Leader: <input id="leader" type="text" />
+      <button id="saveLeader">Save</button>
+    </div>
+    <div>
+      <button id="startBtn">Start</button>
+      <button id="stopBtn">Stop</button>
+    </div>
+    <h2>Accounts</h2>
+    <table id="accountsTable" border="1">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Exchange</th>
+          <th>Env</th>
+          <th>Status</th>
+          <th>USDT</th>
+          <th>BTC</th>
+          <th>Last Result</th>
+          <th>Error</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="accountsTableBody"></tbody>
+    </table>
+    <h3>Add Account</h3>
+    <div id="addAccountForm">
+      Name: <input id="accName" type="text" />
+      Exchange:
+      <select id="accExchange">
+        <option value="binance">Binance</option>
+        <option value="bitget">Bitget</option>
+      </select>
+      Env:
+      <select id="accEnv">
+        <option value="test">test</option>
+        <option value="live">live</option>
+      </select>
+      API Key: <input id="accApiKey" type="text" />
+      API Secret: <input id="accApiSecret" type="text" />
+      <span id="passphraseContainer" style="display: none;">
+        Passphrase: <input id="accPassphrase" type="text" />
+      </span>
+      <button id="verifyAcc">Verify</button>
+      <button id="addAcc">Add</button>
+    </div>
+    <script type="module" src="/renderer.ts"></script>
+  </body>
+</html>
