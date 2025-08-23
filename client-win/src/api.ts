@@ -8,8 +8,13 @@ const client = axios.create({
   }
 });
 
-export async function getStatus() {
-  const res = await client.get('/status');
+export interface CopyStatus {
+  running: boolean;
+  leader: string | null;
+}
+
+export async function getCopyStatus(): Promise<CopyStatus> {
+  const res = await client.get('/copy/status');
   return res.data;
 }
 

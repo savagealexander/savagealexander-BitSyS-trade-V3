@@ -1,5 +1,5 @@
 import {
-  getStatus,
+  getCopyStatus,
   startCopy,
   stopCopy,
   setLeader,
@@ -143,7 +143,7 @@ async function toggleAccount(name: string) {
 
 async function refreshGlobal() {
   try {
-    const data = await getStatus();
+    const data = await getCopyStatus();
     statusEl.textContent = data.running ? 'Running' : 'Stopped';
     leaderInput.value = data.leader || '';
     startBtn.disabled = data.running;

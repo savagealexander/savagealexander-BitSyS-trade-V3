@@ -16,3 +16,10 @@ class StatusResponse(BaseModel):
     """Response model for the `/status` endpoint."""
 
     status: str
+
+
+class CopyStatusResponse(BaseModel):
+    """Response model for copy trading status."""
+
+    running: bool
+    leader: str | None
