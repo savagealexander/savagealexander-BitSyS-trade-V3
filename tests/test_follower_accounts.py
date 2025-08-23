@@ -6,15 +6,17 @@ from fastapi.testclient import TestClient
 def _get_client(tmp_path):
     """Create a TestClient with isolated storage for follower accounts."""
 
-    store = tmp_path / "followers.json"
-    os.environ["FOLLOWER_ACCOUNTS_FILE"] = str(store)
+    store = tmp_path / "accounts.json"
+    os.environ["ACCOUNTS_FILE"] = str(store)
 
-    import services.follower_account_service as svc
+    import server.storage as storage
+    import server.accounts as accounts
     import api.follower_accounts as api_module
     import server.api as server_api
     import server.main as main
 
-    importlib.reload(svc)
+    importlib.reload(storage)
+    importlib.reload(accounts)
     importlib.reload(api_module)
     importlib.reload(server_api)
     importlib.reload(main)
@@ -26,7 +28,7 @@ def _get_client(tmp_path):
 def test_create_and_delete_follower_account(tmp_path):
     client = _get_client(tmp_path)
     payload = {
-        "id": "acc1",
+        "name": "acc1",
         "exchange": "binance",
         "env": "test",
         "api_key": "key123",
@@ -34,7 +36,7 @@ def test_create_and_delete_follower_account(tmp_path):
     }
     resp = client.post("/api/follower-accounts", json=payload)
     assert resp.status_code == 200
-    assert resp.json() == {"id": "acc1"}
+    assert resp.json() == {"name": "acc1"}
 
     # delete
     resp = client.delete("/api/follower-accounts/acc1")
@@ -45,7 +47,7 @@ def test_create_and_delete_follower_account(tmp_path):
 def test_create_duplicate_account_fails(tmp_path):
     client = _get_client(tmp_path)
     payload = {
-        "id": "acc1",
+        "name": "acc1",
         "exchange": "binance",
         "env": "test",
         "api_key": "key",
