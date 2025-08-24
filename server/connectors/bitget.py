@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from typing import Dict, Optional
 
+import base64
 import hmac
 import time
 from hashlib import sha256
@@ -48,13 +49,18 @@ class BitgetConnector:
             method = "GET"
             path = "/api/spot/v1/account/assets"
             prehash = f"{ts}{method}{path}"
-            sign = hmac.new(api_secret.encode(), prehash.encode(), sha256).hexdigest()
+            sign = base64.b64encode(
+                hmac.new(api_secret.encode(), prehash.encode(), sha256).digest()
+            ).decode()
             headers = {
                 "ACCESS-KEY": api_key,
                 "ACCESS-SIGN": sign,
                 "ACCESS-TIMESTAMP": ts,
                 "ACCESS-PASSPHRASE": passphrase,
+                "Content-Type": "application/json",
             }
+            if self.testnet:
+                headers["paptrading"] = "1"
             resp = await self._client.get(path, headers=headers)
             resp.raise_for_status()
             data = resp.json().get("data", [])
@@ -86,32 +92,37 @@ class BitgetConnector:
     ) -> Dict:
         """Place a market order on Bitget.
 
-        The Bitget REST API expects different fields for BUY and SELL orders:
-        ``notional`` (a USDT amount) for buys and ``quantity`` (BTC amount)
-        for sells. Errors will raise ``httpx.HTTPStatusError`` so callers can
-        surface meaningful messages to users.
+        Bitget's v2 spot trade API uses a single ``size`` field for both BUY and
+        SELL orders. For BUY orders, ``size`` represents the quote (USDT) amount
+        to spend. For SELL orders, ``size`` is the base asset amount to sell.
+        Orders also require ``orderType`` and ``force`` parameters. Errors will
+        raise ``httpx.HTTPStatusError`` so callers can surface meaningful
+        messages to users.
         """
 
         ts = str(int(time.time() * 1000))
-        path = "/api/spot/v1/trade/orders"
+        path = "/api/v2/spot/trade/place-order"
         body: Dict[str, str] = {
             "symbol": symbol,
             "side": side.lower(),
-            "type": "market",
+            "orderType": "market",
+            "force": "gtc",
         }
 
         if side.upper() == "BUY":
             if quote_amount is None:
                 raise ValueError("quote_amount required for BUY orders")
-            body["notional"] = str(quote_amount)
+            body["size"] = str(quote_amount)
         else:
             if base_amount is None:
                 raise ValueError("base_amount required for SELL orders")
-            body["quantity"] = str(base_amount)
+            body["size"] = str(base_amount)
 
         body_str = json.dumps(body)
         prehash = f"{ts}POST{path}{body_str}"
-        sign = hmac.new(api_secret.encode(), prehash.encode(), sha256).hexdigest()
+        sign = base64.b64encode(
+            hmac.new(api_secret.encode(), prehash.encode(), sha256).digest()
+        ).decode()
         headers = {
             "ACCESS-KEY": api_key,
             "ACCESS-SIGN": sign,
@@ -119,6 +130,8 @@ class BitgetConnector:
             "ACCESS-PASSPHRASE": passphrase,
             "Content-Type": "application/json",
         }
+        if self.testnet:
+            headers["paptrading"] = "1"
 
         resp = await self._client.post(path, headers=headers, content=body_str)
         resp.raise_for_status()
