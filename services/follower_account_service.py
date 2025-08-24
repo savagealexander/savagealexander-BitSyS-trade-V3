@@ -2,6 +2,7 @@ from __future__ import annotations
 
 """Service for follower account credential validation."""
 
+import base64
 import time
 import hmac
 from hashlib import sha256
@@ -72,13 +73,18 @@ async def verify_credentials(
                 method = "GET"
                 path = "/api/spot/v1/account/assets"
                 prehash = f"{ts}{method}{path}"
-                sig = hmac.new(api_secret.encode(), prehash.encode(), sha256).hexdigest()
+                sig = base64.b64encode(
+                    hmac.new(api_secret.encode(), prehash.encode(), sha256).digest()
+                ).decode()
                 headers = {
                     "ACCESS-KEY": api_key,
                     "ACCESS-SIGN": sig,
                     "ACCESS-TIMESTAMP": ts,
                     "ACCESS-PASSPHRASE": passphrase,
+                    "Content-Type": "application/json",
                 }
+                if testnet:
+                    headers["paptrading"] = "1"
                 resp = await client.get(path, headers=headers)
                 resp.raise_for_status()
                 return True, ""
