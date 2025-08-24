@@ -99,10 +99,11 @@ async def watch_leader_orders(
 
                         print("DEBUG WS EVENT:", raw)
                         data = json.loads(raw)
-                        etype = data.get("e")
+                        payload = data.get("data", data)
+                        etype = payload.get("e")
 
                         if etype == "outboundAccountPosition":
-                            balances = {b["a"]: float(b["f"]) for b in data.get("B", [])}
+                            balances = {b["a"]: float(b["f"]) for b in payload.get("B", [])}
                             last_free_usdt = free_usdt
                             last_free_btc = free_btc
                             free_usdt = balances.get("USDT", free_usdt)
@@ -112,14 +113,14 @@ async def watch_leader_orders(
                         if etype != "executionReport":
                             continue
 
-                        if data.get("X") != "FILLED" or data.get("o") != "MARKET":
+                        if payload.get("X") != "FILLED" or payload.get("o") != "MARKET":
                             continue
 
                         yield {
-                            "event_id": data.get("i"),
-                            "side": data.get("S"),
-                            "quote_filled": float(data.get("Z", 0.0)),
-                            "base_filled": float(data.get("z", 0.0)),
+                            "event_id": payload.get("i"),
+                            "side": payload.get("S"),
+                            "quote_filled": float(payload.get("Z", 0.0)),
+                            "base_filled": float(payload.get("z", 0.0)),
                             "leader_free_usdt": max(last_free_usdt, 1e-9),
                             "leader_free_btc": max(last_free_btc, 1e-9),
                         }
