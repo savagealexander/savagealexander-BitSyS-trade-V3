@@ -21,12 +21,12 @@ class BinanceConnector:
 
     testnet: bool = False
     rest_base: str = "https://api.binance.com"
-    ws_base: str = "wss://stream.binance.com:9443/ws"
+    ws_base: str = "wss://stream.binance.com:9443/stream"
 
     def __post_init__(self) -> None:
         if self.testnet:
             self.rest_base = "https://testnet.binance.vision"
-            self.ws_base = "wss://testnet.binance.vision/ws"
+            self.ws_base = "wss://stream.testnet.binance.vision:9443/stream"
         self._client = httpx.AsyncClient(base_url=self.rest_base)
         self._ws = None
 
@@ -67,7 +67,7 @@ class BinanceConnector:
 
     async def ws_connect(self, stream: str):
         """Return a websocket connection for a given stream."""
-        url = f"{self.ws_base}/{stream}"
+        url = f"{self.ws_base}?streams={stream}"
         self._ws = await websockets.connect(url)
         return self._ws
 
