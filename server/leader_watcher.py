@@ -95,6 +95,7 @@ async def watch_leader_orders(
                             await ws.ping()
                             continue
 
+                        print("DEBUG WS EVENT:", raw)
                         data = json.loads(raw)
                         etype = data.get("e")
 
