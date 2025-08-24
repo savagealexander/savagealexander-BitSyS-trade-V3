@@ -76,11 +76,28 @@ class CopyDispatcher:
             balance = await self._balances.get_balance(account.name)
             quote_amt = balance.get("USDT", 0.0) * quote_ratio
             base_amt = balance.get("BTC", 0.0) * base_ratio
-            print(
-                f"[DISPATCH] {event_id=} {side=} {leader_quote=} {leader_free_usdt=} "
-                f"{quote_ratio=} {leader_base=} {leader_free_btc=} {base_ratio=} "
-                f"{account.name=} {balance=} {quote_amt=} {base_amt=}"
-            )
+            try:
+                print(
+                    f"[DISPATCH] {event_id=} {side=} {leader_quote=} {free_usdt=} "
+                    f"{quote_ratio=} {leader_base=} {free_btc=} {base_ratio=} "
+                    f"{account.name=} {balance=} {quote_amt=} {base_amt=}"
+                )
+            except Exception:
+                pass
+
+            if side == "BUY" and quote_amt <= 0:
+                self._last_results[account.name] = {
+                    "success": False,
+                    "error": "zero quote_amt",
+                }
+                continue
+            if side == "SELL" and base_amt <= 0:
+                self._last_results[account.name] = {
+                    "success": False,
+                    "error": "zero base_amt",
+                }
+                continue
+
             try:
                 async with connector_cls(testnet=account.env == "test") as connector:
                     if side == "BUY":

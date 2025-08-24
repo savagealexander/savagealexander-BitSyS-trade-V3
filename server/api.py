@@ -1,6 +1,7 @@
 """API routes for the trading service."""
 
 import asyncio
+import logging
 import os
 from typing import Any, Dict, List
 
@@ -43,9 +44,14 @@ async def _run_leader_watcher(cfg: LeaderConfig) -> None:
     from . import leader_watcher
 
     async for event in leader_watcher.watch_leader_orders(
-        cfg.api_key, testnet=cfg.env == "test"
+        cfg.api_key,
+        cfg.api_secret,
+        testnet=cfg.env == "test",
     ):
-        await copy_dispatcher.dispatch(event)
+        try:
+            await copy_dispatcher.dispatch(event)
+        except Exception:
+            logging.exception("dispatch failed")
 
 
 # Routers

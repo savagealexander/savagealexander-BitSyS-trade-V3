@@ -48,7 +48,10 @@ async def _keepalive_loop(
 
 
 async def watch_leader_orders(
-    api_key: str, *, testnet: bool = False
+    api_key: str,
+    api_secret: str,
+    *,
+    testnet: bool = False,
 ) -> AsyncIterator[dict]:
     """Yield leader account trade events from Binance user data stream.
 
@@ -71,10 +74,14 @@ async def watch_leader_orders(
                 datetime.utcnow().isoformat(),
             )
 
-            free_usdt = 0.0
-            free_btc = 0.0
-            last_free_usdt = 0.0
-            last_free_btc = 0.0
+            # Seed balances before processing websocket events so the first
+            # trade has reasonable percentage calculations. If the REST call
+            # fails we start with zeros and rely on websocket updates.
+            balances = await connector.get_balance(api_key, api_secret)
+            free_usdt = float(balances.get("USDT", 0.0))
+            free_btc = float(balances.get("BTC", 0.0))
+            last_free_usdt = free_usdt
+            last_free_btc = free_btc
 
             try:
                 ws = await connector.ws_connect(listen_key)
@@ -116,13 +123,16 @@ async def watch_leader_orders(
                         if payload.get("X") != "FILLED" or payload.get("o") != "MARKET":
                             continue
 
+                        leader_free_usdt = last_free_usdt or free_usdt
+                        leader_free_btc = last_free_btc or free_btc
+
                         yield {
                             "event_id": payload.get("i"),
                             "side": payload.get("S"),
                             "quote_filled": float(payload.get("Z", 0.0)),
                             "base_filled": float(payload.get("z", 0.0)),
-                            "leader_free_usdt": max(last_free_usdt, 1e-9),
-                            "leader_free_btc": max(last_free_btc, 1e-9),
+                            "leader_free_usdt": max(leader_free_usdt, 1e-9),
+                            "leader_free_btc": max(leader_free_btc, 1e-9),
                         }
                 finally:
                     keepalive_task.cancel()
