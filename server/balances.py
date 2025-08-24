@@ -79,6 +79,8 @@ class BalanceService:
     async def start(self) -> None:
         """Start polling balances for all known accounts."""
         for account in account_service.list_accounts():
+            # Synchronously populate cache before starting background polling
+            await self.update_balance(account.name)
             self.register_account(account.name)
 
     async def get_balance(self, account_name: str) -> Dict[str, float]:
