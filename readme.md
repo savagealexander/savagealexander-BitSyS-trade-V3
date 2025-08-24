@@ -1,7 +1,7 @@
 BTC/USDT 跟单交易系统 · 需求文档（SRS）
 0. 概述
 
-目标：实时监听“主账户（Binance）”的市价单，并将其“使用可用余额的百分比 X%”复制到多个跟单账户（Binance / Bitget，主网/测试网）。
+目标：实时监听“主账户（Binance）”的市价单，并将其“使用可用余额的百分比 X%”复制到多个跟单账户（Binance 主网/测试网，Bitget 主网/模拟盘）。
 
 资产对：固定 BTC/USDT（Spot）。
 
@@ -19,7 +19,7 @@ MVP 简化：忽略最小交易额检查、滑点保护、手续费缓冲、深�
 
 主账户（Leader）：仅在 Binance（主网或测试网）上；只产生市价单。
 
-跟单账户（Follower）：在 Binance / Bitget（主/测网）上；复制主账户的百分比行为。
+跟单账户（Follower）：在 Binance（主网或测试网）或 Bitget（主网或模拟盘）上；复制主账户的百分比行为。
 
 百分比 X%/Y% 的计算（由系统自动计算）：
 
@@ -44,7 +44,7 @@ FR-2 跟单账户管理
 
 交易所：binance | bitget
 
-环境：prod | test
+  环境：prod | test | demo
 
 API Key/Secret（Bitget 需 passphrase，如有）；
 
@@ -169,7 +169,7 @@ POST /accounts
 {
   "name": "acc-1",
   "exchange": "binance|bitget",
-  "env": "prod|test",
+  "env": "prod|test|demo",
   "api_key": "xxx",
   "api_secret": "yyy",
   "passphrase": "zzz-optional"
@@ -177,6 +177,9 @@ POST /accounts
 
 
 出参：{ "id": "uuid", "status": "CREATED" }
+
+Bitget 模拟盘 API Key 需要先在官网切换到 **Demo Mode**，然后依次点击「个人中心 → API Key 管理 → 创建 Demo API Key」。
+在创建跟单账户时将 `env` 设为 `"demo"`，系统会自动在请求头添加 `paptrading: 1`，请求地址仍为 `https://api.bitget.com`。
 
 POST /accounts/{id}/verify → 返回 { "ok": true, "freeUSDT": 50000.0, "freeBTC": 0.123 }
 
@@ -326,7 +329,7 @@ README.md
 
 11. 验收标准（MVP）
 
-在 Binance 测试网设置主账户、在（Binance/Bitget）测试网添加 ≥2 个跟单账户；
+在 Binance 测试网设置主账户、在（Binance 测试网 / Bitget 模拟盘）添加 ≥2 个跟单账户；
 
 主账户手动或策略触发 市价买入，系统能计算 X% 并分别在每个跟单账户用各自 USDT 的 X% 完成市价买入；
 

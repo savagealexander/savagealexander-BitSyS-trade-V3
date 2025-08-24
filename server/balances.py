@@ -46,12 +46,13 @@ class BalanceService:
         if connector_cls is None:
             return
         try:
-            async with connector_cls(testnet=account.env == "test") as connector:
-                if account.exchange == "bitget":
+            if account.exchange == "bitget":
+                async with connector_cls(demo=account.env == "demo") as connector:
                     balance = await connector.get_balance(
                         account.api_key, account.api_secret, account.passphrase or ""
                     )
-                else:
+            else:
+                async with connector_cls(testnet=account.env == "test") as connector:
                     balance = await connector.get_balance(
                         account.api_key, account.api_secret
                     )

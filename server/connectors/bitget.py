@@ -15,16 +15,13 @@ import websockets
 
 @dataclass
 class BitgetConnector:
-    """Minimal Bitget REST/WebSocket connector with testnet switch."""
+    """Minimal Bitget REST/WebSocket connector with demo trading support."""
 
-    testnet: bool = False
+    demo: bool = False
     rest_base: str = "https://api.bitget.com"
     ws_base: str = "wss://ws.bitget.com/spot/v1/stream"
 
     def __post_init__(self) -> None:
-        if self.testnet:
-            self.rest_base = "https://api-testnet.bitget.com"
-            self.ws_base = "wss://ws.bitgetapi.com/spot/v1/stream"
         self._client = httpx.AsyncClient(base_url=self.rest_base)
         self._ws = None
 
@@ -59,7 +56,7 @@ class BitgetConnector:
                 "ACCESS-PASSPHRASE": passphrase,
                 "Content-Type": "application/json",
             }
-            if self.testnet:
+            if self.demo:
                 headers["paptrading"] = "1"
             resp = await self._client.get(path, headers=headers)
             resp.raise_for_status()
@@ -130,7 +127,7 @@ class BitgetConnector:
             "ACCESS-PASSPHRASE": passphrase,
             "Content-Type": "application/json",
         }
-        if self.testnet:
+        if self.demo:
             headers["paptrading"] = "1"
 
         resp = await self._client.post(path, headers=headers, content=body_str)

@@ -32,12 +32,12 @@ async def verify_credentials(
 
     exchange = exchange.lower()
     env = env.lower()
-    testnet = env not in {"prod", "production", "live"}
 
     if httpx is None:
         return False, "httpx not installed"
 
     if exchange == "binance":
+        testnet = env in {"test", "testnet"}
         base = "https://api.binance.com"
         if testnet:
             base = "https://testnet.binance.vision"
@@ -64,9 +64,8 @@ async def verify_credentials(
     elif exchange == "bitget":
         if not passphrase:
             return False, "passphrase required"
+        demo = env == "demo"
         base = "https://api.bitget.com"
-        if testnet:
-            base = "https://api-testnet.bitget.com"
         async with httpx.AsyncClient(base_url=base) as client:
             try:
                 ts = str(int(time.time() * 1000))
@@ -83,7 +82,7 @@ async def verify_credentials(
                     "ACCESS-PASSPHRASE": passphrase,
                     "Content-Type": "application/json",
                 }
-                if testnet:
+                if demo:
                     headers["paptrading"] = "1"
                 resp = await client.get(path, headers=headers)
                 resp.raise_for_status()
