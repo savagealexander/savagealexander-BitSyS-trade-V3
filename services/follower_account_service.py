@@ -70,7 +70,7 @@ async def verify_credentials(
             try:
                 ts = str(int(time.time() * 1000))
                 method = "GET"
-                path = "/api/spot/v1/account/assets"
+                path = "/api/v2/spot/account/assets"
                 prehash = f"{ts}{method}{path}"
                 sig = base64.b64encode(
                     hmac.new(api_secret.encode(), prehash.encode(), sha256).digest()
