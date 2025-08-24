@@ -73,6 +73,8 @@ async def watch_leader_orders(
 
             free_usdt = 0.0
             free_btc = 0.0
+            last_free_usdt = 0.0
+            last_free_btc = 0.0
 
             try:
                 ws = await connector.ws_connect(listen_key)
@@ -101,6 +103,8 @@ async def watch_leader_orders(
 
                         if etype == "outboundAccountPosition":
                             balances = {b["a"]: float(b["f"]) for b in data.get("B", [])}
+                            last_free_usdt = free_usdt
+                            last_free_btc = free_btc
                             free_usdt = balances.get("USDT", free_usdt)
                             free_btc = balances.get("BTC", free_btc)
                             continue
@@ -116,8 +120,8 @@ async def watch_leader_orders(
                             "side": data.get("S"),
                             "quote_filled": float(data.get("Z", 0.0)),
                             "base_filled": float(data.get("z", 0.0)),
-                            "leader_free_usdt": free_usdt,
-                            "leader_free_btc": free_btc,
+                            "leader_free_usdt": max(last_free_usdt, 1e-9),
+                            "leader_free_btc": max(last_free_btc, 1e-9),
                         }
                 finally:
                     keepalive_task.cancel()
