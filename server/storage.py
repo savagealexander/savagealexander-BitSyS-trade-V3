@@ -70,9 +70,12 @@ class EncryptedJSONStorage:
             f.write(encrypted)
 
 
-_secret = os.getenv("STORAGE_SECRET", "changeme")
+_secret = os.getenv("STORAGE_SECRET")
 _cred_file = os.getenv("LEADER_CRED_FILE", "leader_credentials.json")
-_leader_storage = EncryptedJSONStorage(_cred_file, _secret)
+if _secret:
+    _leader_storage = EncryptedJSONStorage(_cred_file, _secret)
+else:
+    _leader_storage = JSONStorage(_cred_file)
 
 _accounts_file = os.getenv("ACCOUNTS_FILE", "accounts.json")
 _accounts_storage = JSONStorage(_accounts_file)

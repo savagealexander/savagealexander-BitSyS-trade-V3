@@ -27,11 +27,11 @@ class AccountPayload(BaseModel):
 class CredentialsPayload(BaseModel):
     """Payload for verifying credentials."""
 
-    exchange: str = Field(..., min_length=1)
-    env: str = Field(..., min_length=1)
-    api_key: str = Field(..., min_length=1)
-    api_secret: str = Field(..., min_length=1)
-    passphrase: str | None = Field(default=None, min_length=1)
+    exchange: str
+    env: str
+    api_key: str
+    api_secret: str
+    passphrase: str | None = None
 
 
 class VerificationResult(BaseModel):

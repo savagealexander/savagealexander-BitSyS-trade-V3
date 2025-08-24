@@ -76,6 +76,11 @@ class CopyDispatcher:
             balance = await self._balances.get_balance(account.name)
             quote_amt = balance.get("USDT", 0.0) * quote_ratio
             base_amt = balance.get("BTC", 0.0) * base_ratio
+            print(
+                f"[DISPATCH] {event_id=} {side=} {leader_quote=} {leader_free_usdt=} "
+                f"{quote_ratio=} {leader_base=} {leader_free_btc=} {base_ratio=} "
+                f"{account.name=} {balance=} {quote_amt=} {base_amt=}"
+            )
             try:
                 async with connector_cls(testnet=account.env == "test") as connector:
                     if side == "BUY":
