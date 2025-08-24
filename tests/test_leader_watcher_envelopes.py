@@ -41,6 +41,9 @@ class DummyConnector:
     async def keepalive_listen_key(self, api_key, listen_key):
         pass
 
+    async def get_balance(self, api_key, api_secret):
+        return {"USDT": 100.0, "BTC": 1.0}
+
 
 def run(coro):
     return asyncio.run(coro)
@@ -52,7 +55,7 @@ def _run_test(message):
             "server.leader_watcher.BinanceConnector",
             new=lambda testnet=False: DummyConnector([message]),
         ):
-            agen = watch_leader_orders("apikey")
+            agen = watch_leader_orders("apikey", "secret")
             event = await agen.__anext__()
             with contextlib.suppress(BaseException):
                 await agen.aclose()
