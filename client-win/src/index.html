@@ -7,9 +7,16 @@
   <body>
     <h1>Copy Trading Client</h1>
     <div>Status: <span id="status">Unknown</span></div>
-    <div>
-      Leader: <input id="leader" type="text" />
-      <button id="saveLeader">Save</button>
+    <div id="leaderForm">
+      Exchange: Binance
+      Env:
+      <select id="leaderEnv">
+        <option value="test">test</option>
+        <option value="prod">prod</option>
+      </select>
+      API Key: <input id="leaderApiKey" type="text" />
+      API Secret: <input id="leaderApiSecret" type="text" />
+      <button id="saveLeader" disabled>Save</button>
     </div>
     <div>
       <button id="startBtn">Start</button>

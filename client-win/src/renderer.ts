@@ -1,5 +1,5 @@
 import {
-  getStatus,
+  getCopyStatus,
   startCopy,
   stopCopy,
   setLeader,
@@ -12,8 +12,10 @@ import {
 } from './api';
 
 const statusEl = document.getElementById('status')!;
-const leaderInput = document.getElementById('leader') as HTMLInputElement;
 const saveLeaderBtn = document.getElementById('saveLeader') as HTMLButtonElement;
+const leaderEnv = document.getElementById('leaderEnv') as HTMLSelectElement;
+const leaderApiKey = document.getElementById('leaderApiKey') as HTMLInputElement;
+const leaderApiSecret = document.getElementById('leaderApiSecret') as HTMLInputElement;
 const startBtn = document.getElementById('startBtn') as HTMLButtonElement;
 const stopBtn = document.getElementById('stopBtn') as HTMLButtonElement;
 
@@ -27,6 +29,17 @@ const accPassphrase = document.getElementById('accPassphrase') as HTMLInputEleme
 const passphraseContainer = document.getElementById('passphraseContainer')!;
 const verifyAccBtn = document.getElementById('verifyAcc') as HTMLButtonElement;
 const addAccBtn = document.getElementById('addAcc') as HTMLButtonElement;
+
+function updateSaveLeaderBtn() {
+  saveLeaderBtn.disabled =
+    !leaderEnv.value ||
+    !leaderApiKey.value.trim() ||
+    !leaderApiSecret.value.trim();
+}
+
+leaderEnv.addEventListener('change', updateSaveLeaderBtn);
+leaderApiKey.addEventListener('input', updateSaveLeaderBtn);
+leaderApiSecret.addEventListener('input', updateSaveLeaderBtn);
 
 accExchange.addEventListener('change', () => {
   passphraseContainer.style.display =
@@ -143,9 +156,10 @@ async function toggleAccount(name: string) {
 
 async function refreshGlobal() {
   try {
-    const data = await getStatus();
+    const data = await getCopyStatus();
     statusEl.textContent = data.running ? 'Running' : 'Stopped';
-    leaderInput.value = data.leader || '';
+    leaderApiKey.value = data.leader || '';
+    updateSaveLeaderBtn();
     startBtn.disabled = data.running;
     stopBtn.disabled = !data.running;
   } catch (e) {
@@ -202,7 +216,19 @@ stopBtn.addEventListener('click', async () => {
 });
 
 saveLeaderBtn.addEventListener('click', async () => {
-  await setLeader(leaderInput.value);
+  const cfg = {
+    exchange: 'binance',
+    env: leaderEnv.value,
+    api_key: leaderApiKey.value.trim(),
+    api_secret: leaderApiSecret.value.trim()
+  };
+  if (!cfg.env || !cfg.api_key || !cfg.api_secret) {
+    alert('Please fill in all required fields');
+    return;
+  }
+  await setLeader(cfg);
+  leaderApiSecret.value = '';
+  updateSaveLeaderBtn();
   refreshGlobal();
 });
 

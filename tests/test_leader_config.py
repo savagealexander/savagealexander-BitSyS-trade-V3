@@ -1,0 +1,54 @@
+import importlib
+import json
+import os
+from fastapi.testclient import TestClient
+
+
+def _get_client(tmp_path):
+    cred_file = tmp_path / "leader_credentials.json"
+    accounts_file = tmp_path / "accounts.json"
+    os.environ["LEADER_CRED_FILE"] = str(cred_file)
+    os.environ["ACCOUNTS_FILE"] = str(accounts_file)
+
+    import server.storage as storage
+    import server.accounts as accounts
+    import server.copy_dispatcher as copy_module
+    import server.api as server_api
+    import server.main as main
+
+    importlib.reload(storage)
+    importlib.reload(accounts)
+    importlib.reload(copy_module)
+    importlib.reload(server_api)
+    importlib.reload(main)
+
+    app = main.create_app()
+    return TestClient(app)
+
+
+def test_leader_config_requires_all_fields(tmp_path):
+    client = _get_client(tmp_path)
+    payload = {
+        "exchange": "binance",
+        "env": "test",
+        "api_key": "abc",
+    }
+    resp = client.put("/api/leader", json=payload)
+    assert resp.status_code == 422
+
+
+def test_leader_config_accepts_full_payload(tmp_path):
+    client = _get_client(tmp_path)
+    payload = {
+        "exchange": "binance",
+        "env": "test",
+        "api_key": "abc",
+        "api_secret": "xyz",
+    }
+    resp = client.put("/api/leader", json=payload)
+    assert resp.status_code == 200
+    assert resp.json() == {"listening": True}
+
+    cred_file = tmp_path / "leader_credentials.json"
+    saved = json.loads(cred_file.read_text())
+    assert saved == payload

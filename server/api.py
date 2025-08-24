@@ -10,8 +10,8 @@ from pydantic import BaseModel
 from .accounts import AccountStatus, account_service
 from .balances import balance_service
 from .copy_dispatcher import copy_dispatcher
-from .models import LeaderConfig, StatusResponse
-from .storage import save_leader_credentials
+from .models import CopyStatusResponse, LeaderConfig, StatusResponse
+from .storage import load_leader_credentials, save_leader_credentials
 from api.follower_accounts import router as follower_accounts_router
 
 
@@ -88,6 +88,15 @@ async def configure_leader(config: LeaderConfig) -> Dict[str, bool]:
             pass
     _leader_task = asyncio.create_task(_run_leader_watcher(config))
     return {"listening": True}
+
+
+@protected_router.get("/copy/status", response_model=CopyStatusResponse)
+async def get_copy_status() -> CopyStatusResponse:
+    """Return dispatcher running state and stored leader API key."""
+
+    creds = load_leader_credentials()
+    leader = creds.get("api_key") if isinstance(creds, dict) else None
+    return CopyStatusResponse(running=copy_dispatcher.is_running(), leader=leader)
 
 
 @protected_router.post("/copy/start")
