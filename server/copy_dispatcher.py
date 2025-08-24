@@ -99,7 +99,12 @@ class CopyDispatcher:
                 continue
 
             try:
-                async with connector_cls(testnet=account.env == "test") as connector:
+                kwargs = (
+                    {"demo": account.env == "demo"}
+                    if account.exchange == "bitget"
+                    else {"testnet": account.env == "test"}
+                )
+                async with connector_cls(**kwargs) as connector:
                     if side == "BUY":
                         if account.exchange == "bitget":
                             result = await connector.create_market_order(

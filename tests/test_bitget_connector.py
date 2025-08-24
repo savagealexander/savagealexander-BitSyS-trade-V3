@@ -25,7 +25,7 @@ class DummyResponse:
 
 @pytest.mark.asyncio
 async def test_create_market_order_builds_correct_request_buy(monkeypatch):
-    connector = BitgetConnector(testnet=True)
+    connector = BitgetConnector(demo=True)
 
     monkeypatch.setattr(time, "time", lambda: 1.0)
 
@@ -63,7 +63,7 @@ async def test_create_market_order_builds_correct_request_buy(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_create_market_order_builds_correct_request_sell(monkeypatch):
-    connector = BitgetConnector(testnet=True)
+    connector = BitgetConnector(demo=True)
 
     monkeypatch.setattr(time, "time", lambda: 1.0)
 
@@ -107,14 +107,14 @@ async def test_verify_credentials_bitget_headers(monkeypatch):
 
     valid, error = await fas.verify_credentials(
         exchange="bitget",
-        env="test",
+        env="demo",
         api_key="k",
         api_secret="s",
         passphrase="p",
     )
 
     assert valid is True and error == ""
-    assert called["base_url"] == "https://api-testnet.bitget.com"
+    assert called["base_url"] == "https://api.bitget.com"
     headers = called["headers"]
     assert headers["paptrading"] == "1"
     assert headers["Content-Type"] == "application/json"

@@ -103,7 +103,7 @@ def test_bitget_requires_passphrase(tmp_path):
     payload = {
         "name": "acc1",
         "exchange": "bitget",
-        "env": "test",
+        "env": "demo",
         "api_key": "key1",
         "api_secret": "secret1",
         "passphrase": "pp1",
@@ -119,7 +119,7 @@ def test_bitget_requires_passphrase(tmp_path):
 
     verify_payload = {
         "exchange": "bitget",
-        "env": "test",
+        "env": "demo",
         "api_key": "key",
         "api_secret": "secret",
         "passphrase": "pp",
