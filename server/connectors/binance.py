@@ -1,6 +1,6 @@
 """Binance exchange connectors."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, Optional
 
 import hmac
@@ -21,12 +21,17 @@ class BinanceConnector:
 
     testnet: bool = False
     rest_base: str = "https://api.binance.com"
-    ws_base: str = "wss://stream.binance.com:9443/stream"
+    _ws_base: str = field(init=False)
+    _ws_style: str = field(init=False)
 
     def __post_init__(self) -> None:
         if self.testnet:
             self.rest_base = "https://testnet.binance.vision"
-            self.ws_base = "wss://stream.testnet.binance.vision:9443/stream"
+            self._ws_base = "wss://stream.testnet.binance.vision:9443/stream"
+            self._ws_style = "stream"
+        else:
+            self._ws_base = "wss://stream.binance.com:9443/ws"
+            self._ws_style = "ws"
         self._client = httpx.AsyncClient(base_url=self.rest_base)
         self._ws = None
 
@@ -65,9 +70,12 @@ class BinanceConnector:
         except Exception:
             return {"BTC": 0.0, "USDT": 0.0}
 
-    async def ws_connect(self, stream: str):
-        """Return a websocket connection for a given stream."""
-        url = f"{self.ws_base}?streams={stream}"
+    async def ws_connect(self, listen_key: str):
+        """Return a websocket connection for a given listen key."""
+        if self._ws_style == "stream":
+            url = f"{self._ws_base}?streams={listen_key}"
+        else:
+            url = f"{self._ws_base}/{listen_key}"
         self._ws = await websockets.connect(url)
         return self._ws
 
