@@ -8,9 +8,12 @@ import hmac
 import time
 from hashlib import sha256
 import json
+import logging
 
 import httpx
 import websockets
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -63,9 +66,11 @@ class BitgetConnector:
             data = resp.json().get("data", [])
             result: Dict[str, float] = {"BTC": 0.0, "USDT": 0.0}
             for item in data:
-                coin = item.get("coinName")
+                coin = item.get("coin") or item.get("coinName")
                 if coin in result:
                     result[coin] = float(item.get("available", 0.0))
+            if result["BTC"] == 0.0 and result["USDT"] == 0.0:
+                logger.debug("Raw balance data: %s", data)
             return result
         except Exception:
             return {"BTC": 0.0, "USDT": 0.0}
