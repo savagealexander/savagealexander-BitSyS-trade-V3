@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
+import inspect
+
 from .accounts import AccountStatus, account_service, AccountService
 from .balances import balance_service, BalanceService
 from .idempotency import IdempotencyStore
 
 try:  # optional during tests
-    from .connectors import BinanceConnector, BitgetConnector
+    from .connectors import BinanceSDKConnector, BitgetConnector
 except Exception:  # pragma: no cover
-    BinanceConnector = BitgetConnector = None
+    BinanceSDKConnector = BitgetConnector = None
+
+# Maintain backwards compatibility for tests that patch BinanceConnector
+BinanceConnector = BinanceSDKConnector
 
 
 class CopyDispatcher:
@@ -105,52 +110,57 @@ class CopyDispatcher:
                 continue
 
             try:
-                kwargs = (
-                    {"demo": account.env == "demo"}
-                    if account.exchange == "bitget"
-                    else {"testnet": account.env == "test"}
-                )
-                async with connector_cls(**kwargs) as connector:
+                if account.exchange == "binance":
+                    connector = connector_cls(
+                        api_key=account.api_key,
+                        api_secret=account.api_secret,
+                        testnet=account.env == "test",
+                    )
                     if side == "BUY":
-                        if hasattr(connector, "order_market_buy"):
-                            result = await connector.order_market_buy(
-                                "BTCUSDT", quote_amt
-                            )
-                        elif account.exchange == "bitget":
-                            result = await connector.create_market_order(
-                                account.api_key,
-                                account.api_secret,
-                                account.passphrase or "",
-                                side,
-                                quote_amount=quote_amt,
-                            )
-                        else:
-                            result = await connector.create_market_order(
-                                account.api_key,
-                                account.api_secret,
-                                side,
-                                quote_amount=quote_amt,
-                            )
+                        result = connector.order_market_buy("BTCUSDT", quote_amt)
                     else:
-                        if hasattr(connector, "order_market_sell"):
-                            result = await connector.order_market_sell(
-                                "BTCUSDT", base_amt
-                            )
-                        elif account.exchange == "bitget":
-                            result = await connector.create_market_order(
-                                account.api_key,
-                                account.api_secret,
-                                account.passphrase or "",
-                                side,
-                                base_amount=base_amt,
-                            )
+                        result = connector.order_market_sell("BTCUSDT", base_amt)
+                    if inspect.isawaitable(result):
+                        result = await result
+                else:
+                    kwargs = (
+                        {"demo": account.env == "demo"}
+                        if account.exchange == "bitget"
+                        else {"testnet": account.env == "test"}
+                    )
+                    async with connector_cls(**kwargs) as connector:
+                        if account.exchange == "bitget":
+                            if side == "BUY":
+                                result = await connector.create_market_order(
+                                    account.api_key,
+                                    account.api_secret,
+                                    account.passphrase or "",
+                                    side,
+                                    quote_amount=quote_amt,
+                                )
+                            else:
+                                result = await connector.create_market_order(
+                                    account.api_key,
+                                    account.api_secret,
+                                    account.passphrase or "",
+                                    side,
+                                    base_amount=base_amt,
+                                )
                         else:
-                            result = await connector.create_market_order(
-                                account.api_key,
-                                account.api_secret,
-                                side,
-                                base_amount=base_amt,
-                            )
+                            if side == "BUY":
+                                result = await connector.create_market_order(
+                                    account.api_key,
+                                    account.api_secret,
+                                    side,
+                                    quote_amount=quote_amt,
+                                )
+                            else:
+                                result = await connector.create_market_order(
+                                    account.api_key,
+                                    account.api_secret,
+                                    side,
+                                    base_amount=base_amt,
+                                )
                 self._balances.trigger_update(account.name)
                 self._idem.mark_processed(key)
                 self._last_results[account.name] = {"success": True, "data": result}
