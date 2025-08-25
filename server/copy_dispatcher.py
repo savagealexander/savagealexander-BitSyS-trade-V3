@@ -58,8 +58,14 @@ class CopyDispatcher:
         side = order_event.get("side")
         leader_quote = float(order_event.get("quote_filled", 0.0))
         leader_base = float(order_event.get("base_filled", 0.0))
-        free_usdt = float(order_event.get("leader_free_usdt", 0.0))
-        free_btc = float(order_event.get("leader_free_btc", 0.0))
+        free_usdt = float(
+            order_event.get("leader_pre_usdt")
+            or order_event.get("leader_free_usdt", 0.0)
+        )
+        free_btc = float(
+            order_event.get("leader_pre_btc")
+            or order_event.get("leader_free_btc", 0.0)
+        )
 
         quote_ratio = leader_quote / free_usdt if free_usdt else 0.0
         base_ratio = leader_base / free_btc if free_btc else 0.0

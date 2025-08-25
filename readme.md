@@ -354,19 +354,19 @@ Windows UI 能查看余额、查看最近复制记录，支持账户暂停/恢�
 附：复制核心伪代码（供 Codex 参考）
 def on_leader_market_order(event):
     # event: {side: "BUY"|"SELL", quote_filled: float, base_filled: float,
-    #         leader_free_usdt: float, leader_free_btc: float, event_id: str}
+    #         leader_pre_usdt: float, leader_pre_btc: float, event_id: str}
 
     if is_duplicate(event.event_id):
         return
 
     if event.side == "BUY":
-        x = event.quote_filled / max(event.leader_free_usdt, 1e-9)  # X%
+        x = event.quote_filled / max(event.leader_pre_usdt, 1e-9)  # X%
         for acc in followers.active():
             free_usdt = balances.get_free_usdt(acc)
             quote_i = free_usdt * x
             place_market_buy(acc, quote_amount=quote_i)  # binance: quoteOrderQty; bitget: amount
     else:  # SELL
-        y = event.base_filled / max(event.leader_free_btc, 1e-9)   # Y%
+        y = event.base_filled / max(event.leader_pre_btc, 1e-9)   # Y%
         for acc in followers.active():
             free_btc = balances.get_free_btc(acc)
             qty_i = free_btc * y

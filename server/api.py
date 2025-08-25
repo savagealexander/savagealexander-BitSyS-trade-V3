@@ -42,16 +42,18 @@ _leader_task: asyncio.Task | None = None
 
 async def _run_leader_watcher(cfg: LeaderConfig) -> None:
     from . import leader_watcher
-
-    async for event in leader_watcher.watch_leader_orders(
-        cfg.api_key,
-        cfg.api_secret,
-        testnet=cfg.env == "test",
-    ):
-        try:
-            await copy_dispatcher.dispatch(event)
-        except Exception:
-            logging.exception("dispatch failed")
+    try:
+        async for event in leader_watcher.watch_leader_orders(
+            cfg.api_key,
+            cfg.api_secret,
+            testnet=cfg.env == "test",
+        ):
+            try:
+                await copy_dispatcher.dispatch(event)
+            except Exception:
+                logging.exception("dispatch failed")
+    except Exception:
+        logging.exception("leader watcher failed")
 
 
 # Routers

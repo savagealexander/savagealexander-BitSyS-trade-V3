@@ -48,8 +48,8 @@ async def _run_dispatch(side: str):
         "side": side,
         "quote_filled": 10.0,
         "base_filled": 0.001,
-        "leader_free_usdt": 100.0,
-        "leader_free_btc": 1.0,
+        "leader_pre_usdt": 100.0,
+        "leader_pre_btc": 1.0,
     }
     await dispatcher.dispatch(event)
     return dispatcher.get_last_results()["acc1"]
