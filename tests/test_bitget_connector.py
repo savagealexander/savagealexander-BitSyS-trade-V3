@@ -115,12 +115,40 @@ async def test_verify_credentials_bitget_headers(monkeypatch):
 
     assert valid is True and error == ""
     assert called["base_url"] == "https://api.bitget.com"
+    assert called["path"] == "/api/v2/spot/account/assets"
     headers = called["headers"]
     assert headers["paptrading"] == "1"
     assert headers["Content-Type"] == "application/json"
     ts = "1000"
-    prehash = f"{ts}GET/api/spot/v1/account/assets"
+    prehash = f"{ts}GET/api/v2/spot/account/assets"
     expected = base64.b64encode(
         hmac.new(b"s", prehash.encode(), sha256).digest()
     ).decode()
     assert headers["ACCESS-SIGN"] == expected
+
+
+@pytest.mark.asyncio
+async def test_get_balance_parses_available(monkeypatch):
+    connector = BitgetConnector()
+    data = [
+        {"coinName": "BTC", "available": "1.23"},
+        {"coinName": "USDT", "available": "456.7"},
+    ]
+    mock_get = AsyncMock(return_value=DummyResponse({"data": data}))
+    monkeypatch.setattr(connector._client, "get", mock_get)  # type: ignore
+    result = await connector.get_balance("k", "s", "p")
+    assert mock_get.await_args[0][0] == "/api/v2/spot/account/assets"
+    assert result == {"BTC": 1.23, "USDT": 456.7}
+
+
+@pytest.mark.asyncio
+async def test_verify_credentials_bitget_rejects_test_env():
+    valid, error = await fas.verify_credentials(
+        exchange="bitget",
+        env="test",
+        api_key="k",
+        api_secret="s",
+        passphrase="p",
+    )
+    assert valid is False
+    assert "testnet" in error

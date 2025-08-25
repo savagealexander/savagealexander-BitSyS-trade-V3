@@ -44,7 +44,7 @@ FR-2 跟单账户管理
 
 交易所：binance | bitget
 
-  环境：prod | test | demo
+  环境：prod | test | demo（Binance 支持 prod/test，Bitget 支持 prod/demo）
 
 API Key/Secret（Bitget 需 passphrase，如有）；
 
@@ -135,7 +135,7 @@ FR-7 访问控制（后端）
 4. 系统架构（建议）
 4.1 模块
 
-Exchange Connector（Binance / Bitget，各自支持 prod/test）：
+Exchange Connector（Binance 支持 prod/test，Bitget 支持 prod/demo）：
 
 REST 客户端；WebSocket 客户端（主账户需要 userDataStream）。
 
@@ -169,7 +169,7 @@ POST /accounts
 {
   "name": "acc-1",
   "exchange": "binance|bitget",
-  "env": "prod|test|demo",
+  "env": "prod|test|demo"（Binance: prod/test，Bitget: prod/demo）, 
   "api_key": "xxx",
   "api_secret": "yyy",
   "passphrase": "zzz-optional"
