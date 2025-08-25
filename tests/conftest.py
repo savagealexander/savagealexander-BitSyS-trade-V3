@@ -29,7 +29,7 @@ def dummy_binance_sdk(monkeypatch):
         def set_events(cls, events):
             cls._events = events or []
 
-        def get_balance(self):
+        async def get_balance(self):
             return {"USDT": 100.0, "BTC": 1.0}
 
         def start_user_socket(self, callback):

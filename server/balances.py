@@ -57,7 +57,7 @@ class BalanceService:
                     account.api_secret,
                     testnet=account.env == "test",
                 )
-                balance = await asyncio.to_thread(connector.get_balance)
+                balance = await connector.get_balance()
             else:
                 async with connector_cls(testnet=account.env == "test") as connector:
                     balance = await connector.get_balance(

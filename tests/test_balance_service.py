@@ -56,7 +56,7 @@ async def test_update_failure_marks_stale(monkeypatch):
         def __init__(self, api_key, api_secret, testnet=False):
             pass
 
-        def get_balance(self):
+        async def get_balance(self):
             raise RuntimeError("boom")
 
     svc._connectors["binance"] = FailingConnector
@@ -87,7 +87,7 @@ async def test_update_failure_retains_previous_balance(monkeypatch):
         def __init__(self, api_key, api_secret, testnet=False):
             pass
 
-        def get_balance(self):
+        async def get_balance(self):
             raise RuntimeError("boom")
 
     svc._connectors["binance"] = FailingConnector

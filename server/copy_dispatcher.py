@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import inspect
-
 from .accounts import AccountStatus, account_service, AccountService
 from .balances import balance_service, BalanceService
 from .idempotency import IdempotencyStore
@@ -121,11 +119,13 @@ class CopyDispatcher:
                         testnet=account.env == "test",
                     )
                     if side == "BUY":
-                        result = connector.order_market_buy("BTCUSDT", quote_amt)
+                        result = await connector.order_market_buy(
+                            "BTCUSDT", quote_amt
+                        )
                     else:
-                        result = connector.order_market_sell("BTCUSDT", base_amt)
-                    if inspect.isawaitable(result):
-                        result = await result
+                        result = await connector.order_market_sell(
+                            "BTCUSDT", base_amt
+                        )
                 else:
                     kwargs = (
                         {"demo": account.env == "demo"}
