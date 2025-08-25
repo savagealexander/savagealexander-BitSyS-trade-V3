@@ -28,54 +28,53 @@ async def watch_leader_orders(
 
     queue: asyncio.Queue[Dict] = asyncio.Queue()
 
-    connector = BinanceSDKConnector(api_key, api_secret, testnet=testnet)
+    async with BinanceSDKConnector(api_key, api_secret, testnet=testnet) as connector:
+        # Push websocket messages into an asyncio queue for processing.
+        def _handle_message(msg: Dict) -> None:  # pragma: no cover - simple callback
+            queue.put_nowait(msg)
 
-    # Push websocket messages into an asyncio queue for processing.
-    def _handle_message(msg: Dict) -> None:  # pragma: no cover - simple callback
-        queue.put_nowait(msg)
+        connector.start_user_socket(_handle_message)
 
-    connector.start_user_socket(_handle_message)
+        # Seed balances so the first trade has meaningful ratios.
+        balances = await connector.get_balance()
+        free_usdt = float(balances.get("USDT", 0.0))
+        free_btc = float(balances.get("BTC", 0.0))
 
-    # Seed balances so the first trade has meaningful ratios.
-    balances = connector.get_balance()
-    free_usdt = float(balances.get("USDT", 0.0))
-    free_btc = float(balances.get("BTC", 0.0))
+        pending_fill: Dict | None = None
 
-    pending_fill: Dict | None = None
+        while True:
+            payload = await queue.get()
+            etype = payload.get("e")
 
-    while True:
-        payload = await queue.get()
-        etype = payload.get("e")
+            if etype == "outboundAccountPosition":
+                balances = {b["a"]: float(b["f"]) for b in payload.get("B", [])}
+                free_usdt = balances.get("USDT", free_usdt)
+                free_btc = balances.get("BTC", free_btc)
+                if pending_fill:
+                    fill = pending_fill
+                    pending_fill = None
+                    quote = float(fill.get("Z", 0.0))
+                    base = float(fill.get("z", 0.0))
+                    side = fill.get("S")
+                    if side == "BUY":
+                        pre_usdt = free_usdt + quote
+                        pre_btc = free_btc - base
+                    else:  # SELL
+                        pre_usdt = free_usdt - quote
+                        pre_btc = free_btc + base
+                    yield {
+                        "event_id": fill.get("i"),
+                        "side": side,
+                        "quote_filled": quote,
+                        "base_filled": base,
+                        "leader_pre_usdt": max(pre_usdt, 1e-9),
+                        "leader_pre_btc": max(pre_btc, 1e-9),
+                    }
+                continue
 
-        if etype == "outboundAccountPosition":
-            balances = {b["a"]: float(b["f"]) for b in payload.get("B", [])}
-            free_usdt = balances.get("USDT", free_usdt)
-            free_btc = balances.get("BTC", free_btc)
-            if pending_fill:
-                fill = pending_fill
-                pending_fill = None
-                quote = float(fill.get("Z", 0.0))
-                base = float(fill.get("z", 0.0))
-                side = fill.get("S")
-                if side == "BUY":
-                    pre_usdt = free_usdt + quote
-                    pre_btc = free_btc - base
-                else:  # SELL
-                    pre_usdt = free_usdt - quote
-                    pre_btc = free_btc + base
-                yield {
-                    "event_id": fill.get("i"),
-                    "side": side,
-                    "quote_filled": quote,
-                    "base_filled": base,
-                    "leader_pre_usdt": max(pre_usdt, 1e-9),
-                    "leader_pre_btc": max(pre_btc, 1e-9),
-                }
-            continue
+            if etype != "executionReport":
+                continue
+            if payload.get("X") != "FILLED" or payload.get("o") != "MARKET":
+                continue
 
-        if etype != "executionReport":
-            continue
-        if payload.get("X") != "FILLED" or payload.get("o") != "MARKET":
-            continue
-
-        pending_fill = payload
+            pending_fill = payload
