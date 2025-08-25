@@ -67,8 +67,8 @@ class CopyDispatcher:
             or order_event.get("leader_free_btc", 0.0)
         )
 
-        quote_ratio = leader_quote / free_usdt if free_usdt else 0.0
-        base_ratio = leader_base / free_btc if free_btc else 0.0
+        quote_ratio = min(leader_quote / free_usdt, 1.0) if free_usdt else 0.0
+        base_ratio = min(leader_base / free_btc, 1.0) if free_btc else 0.0
 
         for account in self._accounts.list_accounts():
             if account.status != AccountStatus.ACTIVE:
@@ -112,7 +112,11 @@ class CopyDispatcher:
                 )
                 async with connector_cls(**kwargs) as connector:
                     if side == "BUY":
-                        if account.exchange == "bitget":
+                        if hasattr(connector, "order_market_buy"):
+                            result = await connector.order_market_buy(
+                                "BTCUSDT", quote_amt
+                            )
+                        elif account.exchange == "bitget":
                             result = await connector.create_market_order(
                                 account.api_key,
                                 account.api_secret,
@@ -128,7 +132,11 @@ class CopyDispatcher:
                                 quote_amount=quote_amt,
                             )
                     else:
-                        if account.exchange == "bitget":
+                        if hasattr(connector, "order_market_sell"):
+                            result = await connector.order_market_sell(
+                                "BTCUSDT", base_amt
+                            )
+                        elif account.exchange == "bitget":
                             result = await connector.create_market_order(
                                 account.api_key,
                                 account.api_secret,
