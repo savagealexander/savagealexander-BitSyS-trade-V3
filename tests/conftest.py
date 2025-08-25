@@ -32,10 +32,9 @@ def dummy_binance_sdk(monkeypatch):
         async def get_balance(self):
             return {"USDT": 100.0, "BTC": 1.0}
 
-        def start_user_socket(self, callback):
+        async def start_user_socket(self, callback):
             for ev in self.events:
                 callback(ev)
-            return 1
 
         async def __aenter__(self):  # pragma: no cover - simple passthrough
             return self

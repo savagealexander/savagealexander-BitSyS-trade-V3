@@ -19,9 +19,10 @@ async def watch_leader_orders(
 ) -> AsyncIterator[dict]:
     """Yield leader account trade events from Binance user data stream.
 
-    The official ``python-binance`` SDK manages the websocket connection and
-    listen-key keepalive internally.  This coroutine simply bridges the SDK's
-    callback-based interface into an async iterator.
+    The underlying :class:`BinanceSDKConnector` manages the listen-key lifecycle
+    and websocket connection using the official SDK's asynchronous client.
+    This coroutine bridges the connector's callback-based stream into an async
+    iterator.
     """
 
     logger.info("Starting leader order watcher: testnet=%s", testnet)
@@ -33,7 +34,7 @@ async def watch_leader_orders(
         def _handle_message(msg: Dict) -> None:  # pragma: no cover - simple callback
             queue.put_nowait(msg)
 
-        connector.start_user_socket(_handle_message)
+        await connector.start_user_socket(_handle_message)
 
         # Seed balances so the first trade has meaningful ratios.
         balances = await connector.get_balance()
