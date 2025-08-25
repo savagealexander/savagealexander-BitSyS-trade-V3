@@ -128,7 +128,9 @@ class BinanceSDKConnector:
         if AsyncClient is None or websockets is None:  # pragma: no cover - dependency missing
             raise RuntimeError("python-binance and websockets packages are required")
 
-        self._async_client = await AsyncClient.create(self.api_key, self.api_secret)
+        self._async_client = await AsyncClient.create(
+            self.api_key, self.api_secret, testnet=self.testnet
+        )
         if self.testnet:
             self._async_client.API_URL = "https://testnet.binance.vision/api"
             ws_base = "wss://testnet.binance.vision/ws"
