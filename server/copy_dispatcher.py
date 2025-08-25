@@ -72,8 +72,12 @@ class CopyDispatcher:
             or order_event.get("leader_free_btc", 0.0)
         )
 
-        quote_ratio = min(leader_quote / free_usdt, 1.0) if free_usdt else 0.0
-        base_ratio = min(leader_base / free_btc, 1.0) if free_btc else 0.0
+        quote_ratio = (
+            max(0.0, min(leader_quote / free_usdt, 1.0)) if free_usdt else 0.0
+        )
+        base_ratio = (
+            max(0.0, min(leader_base / free_btc, 1.0)) if free_btc else 0.0
+        )
 
         for account in self._accounts.list_accounts():
             if account.status != AccountStatus.ACTIVE:
@@ -85,8 +89,8 @@ class CopyDispatcher:
             if connector_cls is None:
                 continue
             balance = await self._balances.get_balance(account.name)
-            quote_amt = balance.get("USDT", 0.0) * quote_ratio
-            base_amt = balance.get("BTC", 0.0) * base_ratio
+            quote_amt = max(0.0, balance.get("USDT", 0.0) * quote_ratio)
+            base_amt = max(0.0, balance.get("BTC", 0.0) * base_ratio)
             try:
                 print(
                     f"[DISPATCH] {event_id=} {side=} {leader_quote=} {free_usdt=} "
