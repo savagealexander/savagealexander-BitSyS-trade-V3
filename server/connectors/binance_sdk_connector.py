@@ -8,13 +8,20 @@ codebase are implemented.
 from __future__ import annotations
 
 import asyncio
+import json
+import contextlib
 from dataclasses import dataclass, field
 from typing import Callable, Dict, Optional
 
 try:  # pragma: no cover - optional dependency during tests
-    from binance import Client, ThreadedWebsocketManager
+    from binance import Client, AsyncClient
 except Exception:  # pragma: no cover
-    Client = ThreadedWebsocketManager = None  # type: ignore
+    Client = AsyncClient = None  # type: ignore
+
+try:  # pragma: no cover - optional dependency during tests
+    import websockets
+except Exception:  # pragma: no cover
+    websockets = None
 
 
 CallbackType = Callable[[Dict], None]
@@ -28,12 +35,16 @@ class BinanceSDKConnector:
     api_secret: str
     testnet: bool = False
     _client: Client = field(init=False)
-    _twm: Optional[ThreadedWebsocketManager] = field(default=None, init=False)
+    _async_client: Optional[AsyncClient] = field(default=None, init=False)
+    _ws_task: Optional[asyncio.Task] = field(default=None, init=False)
+    _keepalive_task: Optional[asyncio.Task] = field(default=None, init=False)
 
     def __post_init__(self) -> None:  # pragma: no cover - simple assignment
         if Client is None:  # pragma: no cover - dependency missing
             raise RuntimeError("python-binance package is required")
         self._client = Client(self.api_key, self.api_secret, testnet=self.testnet)
+        if self.testnet:
+            self._client.API_URL = "https://testnet.binance.vision/api"
 
     # ------------------------------------------------------------------
     # Balance and order helpers
@@ -87,21 +98,22 @@ class BinanceSDKConnector:
     # Websocket handling
     # ------------------------------------------------------------------
     async def __aenter__(self) -> "BinanceSDKConnector":
-        if ThreadedWebsocketManager is None:  # pragma: no cover - dependency missing
-            raise RuntimeError("python-binance package is required")
-        if self._twm is None:
-            self._twm = ThreadedWebsocketManager(
-                api_key=self.api_key,
-                api_secret=self.api_secret,
-                testnet=self.testnet,
-            )
-            self._twm.start()
         return self
 
     async def close(self) -> None:
-        if self._twm is not None:
-            await asyncio.to_thread(self._twm.stop)
-            self._twm = None
+        if self._ws_task is not None:
+            self._ws_task.cancel()
+            with contextlib.suppress(Exception):
+                await self._ws_task
+            self._ws_task = None
+        if self._keepalive_task is not None:
+            self._keepalive_task.cancel()
+            with contextlib.suppress(Exception):
+                await self._keepalive_task
+            self._keepalive_task = None
+        if self._async_client is not None:
+            await self._async_client.close_connection()
+            self._async_client = None
         # Ensure underlying HTTP session is properly closed to release resources
         session = getattr(self._client, "session", None)
         if session is not None:
@@ -110,10 +122,37 @@ class BinanceSDKConnector:
     async def __aexit__(self, exc_type, exc, tb) -> None:  # pragma: no cover - simple pass
         await self.close()
 
-    def start_user_socket(self, callback: CallbackType) -> int:
-        """Start a user data stream and return its socket id."""
+    async def start_user_socket(self, callback: CallbackType) -> None:
+        """Start the user data stream and dispatch messages to ``callback``."""
 
-        if self._twm is None:
-            raise RuntimeError("Websocket manager not running; use 'async with' context")
-        return self._twm.start_user_socket(callback)
+        if AsyncClient is None or websockets is None:  # pragma: no cover - dependency missing
+            raise RuntimeError("python-binance and websockets packages are required")
+
+        self._async_client = await AsyncClient.create(self.api_key, self.api_secret)
+        if self.testnet:
+            self._async_client.API_URL = "https://testnet.binance.vision/api"
+            ws_base = "wss://testnet.binance.vision/ws"
+        else:
+            ws_base = "wss://stream.binance.com:9443/ws"
+
+        listen_key = await self._async_client.new_listen_key()
+
+        async def _keepalive() -> None:
+            while True:
+                await asyncio.sleep(30 * 60)
+                try:
+                    await self._async_client.keepalive_listen_key(listen_key)
+                except Exception:  # pragma: no cover - network errors
+                    break
+
+        self._keepalive_task = asyncio.create_task(_keepalive())
+
+        async def _ws_listener() -> None:
+            url = f"{ws_base}/{listen_key}"
+            async with websockets.connect(url) as ws:
+                async for message in ws:
+                    data = json.loads(message)
+                    callback(data)
+
+        self._ws_task = asyncio.create_task(_ws_listener())
 
