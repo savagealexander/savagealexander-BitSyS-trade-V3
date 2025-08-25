@@ -10,7 +10,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Callable, Dict, Optional
 
-from binance import Client, ThreadedWebsocketManager
+try:  # pragma: no cover - optional dependency during tests
+    from binance import Client, ThreadedWebsocketManager
+except Exception:  # pragma: no cover
+    Client = ThreadedWebsocketManager = None  # type: ignore
 
 
 CallbackType = Callable[[Dict], None]
@@ -27,6 +30,8 @@ class BinanceSDKConnector:
     _twm: Optional[ThreadedWebsocketManager] = field(default=None, init=False)
 
     def __post_init__(self) -> None:  # pragma: no cover - simple assignment
+        if Client is None:  # pragma: no cover - dependency missing
+            raise RuntimeError("python-binance package is required")
         self._client = Client(self.api_key, self.api_secret, testnet=self.testnet)
 
     # ------------------------------------------------------------------
