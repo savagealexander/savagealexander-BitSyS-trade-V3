@@ -128,11 +128,25 @@ async def test_verify_credentials_bitget_headers(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_get_balance_parses_available(monkeypatch):
+async def test_get_balance_parses_coinName(monkeypatch):
     connector = BitgetConnector()
     data = [
         {"coinName": "BTC", "available": "1.23"},
         {"coinName": "USDT", "available": "456.7"},
+    ]
+    mock_get = AsyncMock(return_value=DummyResponse({"data": data}))
+    monkeypatch.setattr(connector._client, "get", mock_get)  # type: ignore
+    result = await connector.get_balance("k", "s", "p")
+    assert mock_get.await_args[0][0] == "/api/v2/spot/account/assets"
+    assert result == {"BTC": 1.23, "USDT": 456.7}
+
+
+@pytest.mark.asyncio
+async def test_get_balance_parses_coin(monkeypatch):
+    connector = BitgetConnector()
+    data = [
+        {"coin": "BTC", "available": "1.23"},
+        {"coin": "USDT", "available": "456.7"},
     ]
     mock_get = AsyncMock(return_value=DummyResponse({"data": data}))
     monkeypatch.setattr(connector._client, "get", mock_get)  # type: ignore
