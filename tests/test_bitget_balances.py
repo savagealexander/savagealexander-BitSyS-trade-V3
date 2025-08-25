@@ -55,4 +55,4 @@ async def test_balance_endpoint_returns_values(monkeypatch, tmp_path):
     await balance_service.update_balance("acc1")
     resp = client.get("/api/balances/acc1")
     assert resp.status_code == 200
-    assert resp.json() == {"BTC": 0.5, "USDT": 100.0}
+    assert resp.json() == {"BTC": 0.5, "USDT": 100.0, "stale": False}
