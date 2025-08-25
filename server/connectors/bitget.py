@@ -38,13 +38,13 @@ class BitgetConnector:
     async def get_balance(self, api_key: str, api_secret: str, passphrase: str) -> Dict[str, float]:
         """Return available BTC and USDT balances.
 
-        Uses the ``/api/spot/v1/account/assets`` endpoint which requires a
+        Uses the ``/api/v2/spot/account/assets`` endpoint which requires a
         signed request. Failures result in zero balances being returned.
         """
         try:
             ts = str(int(time.time() * 1000))
             method = "GET"
-            path = "/api/spot/v1/account/assets"
+            path = "/api/v2/spot/account/assets"
             prehash = f"{ts}{method}{path}"
             sign = base64.b64encode(
                 hmac.new(api_secret.encode(), prehash.encode(), sha256).digest()

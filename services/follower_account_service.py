@@ -62,6 +62,8 @@ async def verify_credentials(
                 return False, str(exc)
 
     elif exchange == "bitget":
+        if env == "test":
+            return False, "Bitget spot testnet not supported, use 'demo' instead"
         if not passphrase:
             return False, "passphrase required"
         demo = env == "demo"

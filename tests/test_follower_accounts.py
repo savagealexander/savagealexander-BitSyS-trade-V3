@@ -155,3 +155,23 @@ def test_create_rejects_invalid_credentials(tmp_path):
     resp = client.post("/api/follower-accounts", json=payload)
     assert resp.status_code == 200
     assert resp.json() == {"name": "acc1"}
+
+
+def test_bitget_env_test_rejected(tmp_path):
+    client = _get_client(tmp_path)
+    import services.follower_account_service as fas
+    import importlib
+    fas = importlib.reload(fas)
+    payload = {
+        "name": "acc1",
+        "exchange": "bitget",
+        "env": "test",
+        "api_key": "k",
+        "api_secret": "s",
+        "passphrase": "p",
+    }
+    resp = client.post("/api/follower-accounts", json=payload)
+    assert resp.status_code == 400
+    assert resp.json() == {
+        "detail": "Bitget spot testnet not supported, use 'demo' instead"
+    }
