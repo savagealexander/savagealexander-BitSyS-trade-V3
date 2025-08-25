@@ -102,6 +102,10 @@ class BinanceSDKConnector:
         if self._twm is not None:
             await asyncio.to_thread(self._twm.stop)
             self._twm = None
+        # Ensure underlying HTTP session is properly closed to release resources
+        session = getattr(self._client, "session", None)
+        if session is not None:
+            await asyncio.to_thread(session.close)
 
     async def __aexit__(self, exc_type, exc, tb) -> None:  # pragma: no cover - simple pass
         await self.close()
