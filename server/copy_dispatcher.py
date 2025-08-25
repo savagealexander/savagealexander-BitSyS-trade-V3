@@ -118,14 +118,17 @@ class CopyDispatcher:
                         api_secret=account.api_secret,
                         testnet=account.env == "test",
                     )
-                    if side == "BUY":
-                        result = await connector.order_market_buy(
-                            "BTCUSDT", quote_amt
-                        )
-                    else:
-                        result = await connector.order_market_sell(
-                            "BTCUSDT", base_amt
-                        )
+                    try:
+                        if side == "BUY":
+                            result = await connector.order_market_buy(
+                                "BTCUSDT", quote_amt
+                            )
+                        else:
+                            result = await connector.order_market_sell(
+                                "BTCUSDT", base_amt
+                            )
+                    finally:
+                        await connector.close()
                 else:
                     kwargs = (
                         {"demo": account.env == "demo"}
