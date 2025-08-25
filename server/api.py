@@ -74,7 +74,7 @@ async def read_status() -> StatusResponse:
 # ---------------------------------------------------------------------------
 
 @protected_router.get("/balances/{account}")
-async def read_balance(account: str) -> Dict[str, float]:
+async def read_balance(account: str) -> Dict[str, float | bool]:
     """Return the most recently cached balance for ``account``."""
     return await balance_service.get_balance(account)
 

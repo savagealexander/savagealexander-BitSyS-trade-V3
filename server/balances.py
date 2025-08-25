@@ -23,7 +23,7 @@ class BalanceService:
     """
 
     def __init__(self, poll_interval: float = 5.0) -> None:
-        self._cache: Dict[str, Dict[str, float]] = {}
+        self._cache: Dict[str, Dict[str, float | bool]] = {}
         self._poll_interval = poll_interval
         self._connectors = {}
         if BinanceConnector:
@@ -56,10 +56,14 @@ class BalanceService:
                     balance = await connector.get_balance(
                         account.api_key, account.api_secret
                     )
-            self._cache[account_name] = balance
+            self._cache[account_name] = {**balance, "stale": False}
         except Exception:
             # Errors are swallowed to keep polling alive
-            self._cache.setdefault(account_name, {"BTC": 0.0, "USDT": 0.0})
+            prev = self._cache.get(
+                account_name, {"BTC": 0.0, "USDT": 0.0, "stale": True}
+            )
+            prev["stale"] = True
+            self._cache[account_name] = prev
 
     def trigger_update(self, account_name: str) -> None:
         """Trigger an asynchronous balance refresh for ``account_name``."""
@@ -84,9 +88,11 @@ class BalanceService:
             await self.update_balance(account.name)
             self.register_account(account.name)
 
-    async def get_balance(self, account_name: str) -> Dict[str, float]:
+    async def get_balance(self, account_name: str) -> Dict[str, float | bool]:
         """Return cached balance information for an account."""
-        return self._cache.get(account_name, {"BTC": 0.0, "USDT": 0.0})
+        return self._cache.get(
+            account_name, {"BTC": 0.0, "USDT": 0.0, "stale": True}
+        )
 
 
 # Singleton instance used by API routes
