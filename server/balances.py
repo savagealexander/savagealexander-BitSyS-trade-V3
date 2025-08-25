@@ -8,10 +8,10 @@ from typing import Dict
 from .accounts import account_service
 
 try:  # Optional imports during tests where dependencies may be missing
-    from .connectors.binance import BinanceConnector
+    from .connectors.binance_sdk_connector import BinanceSDKConnector
     from .connectors.bitget import BitgetConnector
 except Exception:  # pragma: no cover - degraded functionality for tests
-    BinanceConnector = BitgetConnector = None
+    BinanceSDKConnector = BitgetConnector = None
 
 
 class BalanceService:
@@ -26,8 +26,8 @@ class BalanceService:
         self._cache: Dict[str, Dict[str, float | bool]] = {}
         self._poll_interval = poll_interval
         self._connectors = {}
-        if BinanceConnector:
-            self._connectors["binance"] = BinanceConnector
+        if BinanceSDKConnector:
+            self._connectors["binance"] = BinanceSDKConnector
         if BitgetConnector:
             self._connectors["bitget"] = BitgetConnector
         self._tasks: Dict[str, asyncio.Task] = {}
@@ -51,6 +51,13 @@ class BalanceService:
                     balance = await connector.get_balance(
                         account.api_key, account.api_secret, account.passphrase or ""
                     )
+            elif account.exchange == "binance":
+                connector = connector_cls(
+                    account.api_key,
+                    account.api_secret,
+                    testnet=account.env == "test",
+                )
+                balance = await asyncio.to_thread(connector.get_balance)
             else:
                 async with connector_cls(testnet=account.env == "test") as connector:
                     balance = await connector.get_balance(
