@@ -66,3 +66,37 @@ async def test_update_failure_marks_stale(monkeypatch):
     svc._cache["acc1"] = {"BTC": 1.0, "USDT": 2.0, "stale": False}
     await svc.update_balance("acc1")
     assert svc._cache["acc1"] == {"BTC": 1.0, "USDT": 2.0, "stale": True}
+
+
+@pytest.mark.asyncio
+async def test_update_failure_retains_previous_balance(monkeypatch):
+    svc = BalanceService()
+
+    account = SimpleNamespace(
+        name="acc1",
+        exchange="binance",
+        env="test",
+        api_key="k",
+        api_secret="s",
+        passphrase=None,
+    )
+    monkeypatch.setattr(
+        balances,
+        "account_service",
+        SimpleNamespace(list_accounts=lambda: [account]),
+    )
+
+    class FailingConnector:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            pass
+
+        async def get_balance(self, api_key, api_secret):
+            raise RuntimeError("boom")
+
+    svc._connectors["binance"] = FailingConnector
+    svc._cache["acc1"] = {"BTC": 0.5, "USDT": 10.0, "stale": False}
+    await svc.update_balance("acc1")
+    assert svc._cache["acc1"] == {"BTC": 0.5, "USDT": 10.0, "stale": True}
