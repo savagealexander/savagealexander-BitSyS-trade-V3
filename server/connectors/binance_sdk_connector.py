@@ -137,7 +137,8 @@ class BinanceSDKConnector:
         else:
             ws_base = "wss://stream.binance.com:9443/ws"
 
-        listen_key = await self._async_client.new_listen_key()
+        response = await self._async_client.new_listen_key()
+        listen_key = response["listenKey"] if isinstance(response, dict) else response
 
         async def _keepalive() -> None:
             while True:
