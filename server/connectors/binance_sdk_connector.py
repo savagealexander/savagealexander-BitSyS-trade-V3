@@ -10,21 +10,29 @@ from __future__ import annotations
 import asyncio
 import json
 import contextlib
+import logging
 from dataclasses import dataclass, field
 from typing import Callable, Dict, Optional
 
 try:  # pragma: no cover - optional dependency during tests
-    from binance import Client, AsyncClient
+    from binance import Client
 except Exception:  # pragma: no cover
-    Client = AsyncClient = None  # type: ignore
+    Client = None  # type: ignore
 
 try:  # pragma: no cover - optional dependency during tests
     import websockets
 except Exception:  # pragma: no cover
     websockets = None
 
+try:  # pragma: no cover - optional dependency during tests
+    import httpx
+except Exception:  # pragma: no cover
+    httpx = None
+
 
 CallbackType = Callable[[Dict], None]
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -35,9 +43,10 @@ class BinanceSDKConnector:
     api_secret: str
     testnet: bool = False
     _client: Client = field(init=False)
-    _async_client: Optional[AsyncClient] = field(default=None, init=False)
     _ws_task: Optional[asyncio.Task] = field(default=None, init=False)
     _keepalive_task: Optional[asyncio.Task] = field(default=None, init=False)
+    _http: Optional[httpx.AsyncClient] = field(default=None, init=False)
+    _ws: Optional[websockets.WebSocketClientProtocol] = field(default=None, init=False)
 
     def __post_init__(self) -> None:  # pragma: no cover - simple assignment
         if Client is None:  # pragma: no cover - dependency missing
@@ -111,9 +120,13 @@ class BinanceSDKConnector:
             with contextlib.suppress(Exception):
                 await self._keepalive_task
             self._keepalive_task = None
-        if self._async_client is not None:
-            await self._async_client.close_connection()
-            self._async_client = None
+        if self._ws is not None:
+            with contextlib.suppress(Exception):
+                await self._ws.close()
+            self._ws = None
+        if self._http is not None:
+            await self._http.aclose()
+            self._http = None
         # Ensure underlying HTTP session is properly closed to release resources
         session = getattr(self._client, "session", None)
         if session is not None:
@@ -125,37 +138,75 @@ class BinanceSDKConnector:
     async def start_user_socket(self, callback: CallbackType) -> None:
         """Start the user data stream and dispatch messages to ``callback``."""
 
-        if AsyncClient is None or websockets is None:  # pragma: no cover - dependency missing
-            raise RuntimeError("python-binance and websockets packages are required")
+        if websockets is None or httpx is None:  # pragma: no cover - dependency missing
+            raise RuntimeError("websockets and httpx packages are required")
 
-        self._async_client = await AsyncClient.create(
-            self.api_key, self.api_secret, testnet=self.testnet
-        )
+        rest_base = "https://api.binance.com"
+        ws_base = "wss://stream.binance.com:9443/ws"
         if self.testnet:
-            self._async_client.API_URL = "https://testnet.binance.vision/api"
-            ws_base = "wss://testnet.binance.vision/ws"
-        else:
-            ws_base = "wss://stream.binance.com:9443/ws"
+            rest_base = "https://testnet.binance.vision"
+            ws_base = "wss://stream.testnet.binance.vision:9443/ws"
+        if self._http is None:
+            self._http = httpx.AsyncClient(base_url=rest_base)
 
-        response = await self._async_client.new_listen_key()
-        listen_key = response["listenKey"] if isinstance(response, dict) else response
+        headers = {"X-MBX-APIKEY": self.api_key}
 
-        async def _keepalive() -> None:
+        async def _runner() -> None:
             while True:
-                await asyncio.sleep(30 * 60)
                 try:
-                    await self._async_client.keepalive_listen_key(listen_key)
-                except Exception:  # pragma: no cover - network errors
-                    break
+                    resp = await self._http.post("/api/v3/userDataStream", headers=headers)
+                    resp.raise_for_status()
+                    listen_key = resp.json().get("listenKey")
+                    logger.info("listen key retrieved")
+                except asyncio.CancelledError:  # pragma: no cover - task cancelled
+                    raise
+                except Exception as exc:  # pragma: no cover - network errors
+                    logger.warning("failed to obtain listen key: %s", exc)
+                    await asyncio.sleep(5)
+                    continue
 
-        self._keepalive_task = asyncio.create_task(_keepalive())
+                async with websockets.connect(f"{ws_base}/{listen_key}") as ws:
+                    self._ws = ws
 
-        async def _ws_listener() -> None:
-            url = f"{ws_base}/{listen_key}"
-            async with websockets.connect(url) as ws:
-                async for message in ws:
-                    data = json.loads(message)
-                    callback(data)
+                    async def _keepalive() -> None:
+                        logger.info("keepalive started")
+                        try:
+                            while True:
+                                await asyncio.sleep(30 * 60)
+                                try:
+                                    await self._http.put(
+                                        "/api/v3/userDataStream",
+                                        params={"listenKey": listen_key},
+                                        headers=headers,
+                                    )
+                                except Exception as exc:  # pragma: no cover - network errors
+                                    logger.warning("keepalive failed: %s", exc)
+                                    await ws.close()
+                                    break
+                        except asyncio.CancelledError:  # pragma: no cover - task cancelled
+                            pass
+                        finally:
+                            logger.info("keepalive stopped")
 
-        self._ws_task = asyncio.create_task(_ws_listener())
+                    self._keepalive_task = asyncio.create_task(_keepalive())
+
+                    try:
+                        async for message in ws:
+                            data = json.loads(message)
+                            callback(data)
+                    except asyncio.CancelledError:  # pragma: no cover - task cancelled
+                        raise
+                    except Exception as exc:  # pragma: no cover - network errors
+                        logger.warning("websocket error: %s", exc)
+                    finally:
+                        if self._keepalive_task is not None:
+                            self._keepalive_task.cancel()
+                            with contextlib.suppress(Exception):
+                                await self._keepalive_task
+                            self._keepalive_task = None
+                        self._ws = None
+                        logger.info("websocket closed, reconnecting")
+                        await asyncio.sleep(1)
+
+        self._ws_task = asyncio.create_task(_runner())
 
