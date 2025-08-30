@@ -94,7 +94,9 @@ async def configure_leader(config: LeaderConfig) -> Dict[str, bool]:
             await _leader_task
         except Exception:
             pass
+
     _leader_task = asyncio.create_task(_run_leader_watcher(config))
+    logging.info("[LEADER] watcher restarted in background")
     return {"listening": True}
 
 
