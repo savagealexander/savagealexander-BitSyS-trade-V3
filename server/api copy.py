@@ -1,7 +1,5 @@
 """API routes for the trading service."""
 
-from __future__ import annotations
-
 import asyncio
 import logging
 import os
@@ -15,13 +13,7 @@ from .balances import balance_service
 from .copy_dispatcher import copy_dispatcher
 from .models import CopyStatusResponse, LeaderConfig, StatusResponse
 from .storage import load_leader_credentials, save_leader_credentials
-
-# ⚠️ 注意：
-# 你的 follower 相关接口定义在独立模块中，需要把它的 router include 进来。
-# 如果你的 follower_accounts.py 位于顶层包 `api/` 目录下，请保持下面这一行不变；
-# 如果你的文件在 `server/api/follower_accounts.py`，请改成：
-#   from .api.follower_accounts import router as follower_accounts_router
-from api.follower_accounts import router as follower_accounts_router  # 按你当前工程保持一致
+from api.follower_accounts import router as follower_accounts_router
 
 
 # ---------------------------------------------------------------------------
@@ -33,10 +25,10 @@ API_TOKEN = os.getenv("API_TOKEN", "")
 
 async def verify_token(authorization: str = Header("")) -> None:
     """Validate ``Authorization`` header against ``API_TOKEN`` env var."""
+
     if not API_TOKEN:
         return
     expected = f"Bearer {API_TOKEN}"
-    # 兼容两种写法：直接传 token 或标准 Bearer 头
     if authorization != expected and authorization != API_TOKEN:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
@@ -49,27 +41,19 @@ _leader_task: asyncio.Task | None = None
 
 
 async def _run_leader_watcher(cfg: LeaderConfig) -> None:
-    """Create leader watcher stream and dispatch copy-trade events."""
     from . import leader_watcher
-
-    logging.info("[LEADER] _run_leader_watcher starting...")
-
     try:
-        logging.info("[LEADER] launching watch_leader_orders stream...")
         async for event in leader_watcher.watch_leader_orders(
             cfg.api_key,
             cfg.api_secret,
             testnet=cfg.env == "test",
         ):
             try:
-                logging.info(f"[LEADER] received event: {event.get('type')}")
                 await copy_dispatcher.dispatch(event)
             except Exception:
                 logging.exception("dispatch failed")
-    except Exception as e:  # 打印完整 traceback，便于诊断
-        import traceback
-        logging.error(f"❌ leader watcher failed: {e}")
-        logging.error(traceback.format_exc())
+    except Exception:
+        logging.exception("leader watcher failed")
 
 
 # Routers
@@ -100,6 +84,7 @@ async def read_balance(account: str) -> Dict[str, float | bool]:
 @protected_router.put("/leader")
 async def configure_leader(config: LeaderConfig) -> Dict[str, bool]:
     """Persist leader credentials and start watching orders."""
+
     save_leader_credentials(config.dict())
 
     global _leader_task
@@ -111,8 +96,6 @@ async def configure_leader(config: LeaderConfig) -> Dict[str, bool]:
             pass
 
     _leader_task = asyncio.create_task(_run_leader_watcher(config))
-    # 你之前加的“验活”打印，保留：
-    print("🔥🔥🔥 configure_leader() 被调用了并成功创建了 watcher task")
     logging.info("[LEADER] watcher restarted in background")
     return {"listening": True}
 
@@ -120,6 +103,7 @@ async def configure_leader(config: LeaderConfig) -> Dict[str, bool]:
 @protected_router.get("/copy/status", response_model=CopyStatusResponse)
 async def get_copy_status() -> CopyStatusResponse:
     """Return dispatcher running state and stored leader API key."""
+
     creds = load_leader_credentials()
     leader = creds.get("api_key") if isinstance(creds, dict) else None
     return CopyStatusResponse(running=copy_dispatcher.is_running(), leader=leader)
@@ -149,8 +133,10 @@ async def get_copy_results() -> Dict[str, Dict[str, Any]]:
 # Account management
 # ---------------------------------------------------------------------------
 
+
 class AccountStatusPayload(BaseModel):
     """Payload for updating an account's status."""
+
     status: AccountStatus
 
 
@@ -161,15 +147,15 @@ async def list_accounts() -> List[Dict[str, Any]]:
 
 
 @protected_router.put("/accounts/{name}/status")
-async def update_account_status(name: str, payload: AccountStatusPayload) -> Dict[str, str]:
+async def update_account_status(
+    name: str, payload: AccountStatusPayload
+) -> Dict[str, str]:
     """Update the status of an account."""
+
     account_service.update_account(name, status=payload.status)
     return {"status": payload.status.value}
 
 
-# ---------------------------------------------------------------------------
-# Mount follower account management subrouter
-# ---------------------------------------------------------------------------
-
-# 把 follower 的子路由挂到受保护的分组下（继承 /api 前缀与鉴权）
+# Include follower account management routes
 protected_router.include_router(follower_accounts_router)
+

@@ -101,3 +101,9 @@ async def verify_account_credentials(payload: CredentialsPayload) -> Verificatio
         passphrase=payload.passphrase,
     )
     return {"valid": valid, "error": error}
+
+
+@router.get("", response_model=list[Account])
+async def list_follower_accounts() -> list[Account]:
+    """List all registered follower accounts."""
+    return account_service.list_accounts()

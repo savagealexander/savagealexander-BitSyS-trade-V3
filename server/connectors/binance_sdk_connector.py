@@ -1,9 +1,4 @@
-"""Binance connector using the official python-binance SDK.
-
-This provides a minimal wrapper around :class:`binance.Client` exposing the
-operations used by the service layer.  Only the pieces required by the current
-codebase are implemented.
-"""
+"""Binance connector using the official python-binance SDK."""
 
 from __future__ import annotations
 
@@ -15,21 +10,20 @@ import inspect
 from dataclasses import dataclass, field
 from typing import Callable, Dict, Optional
 
-try:  # pragma: no cover - optional dependency during tests
+try:
     from binance import Client
-except Exception:  # pragma: no cover
+except Exception:
     Client = None  # type: ignore
 
-try:  # pragma: no cover - optional dependency during tests
+try:
     import websockets
-except Exception:  # pragma: no cover
+except Exception:
     websockets = None
 
-try:  # pragma: no cover - optional dependency during tests
+try:
     import httpx
-except Exception:  # pragma: no cover
+except Exception:
     httpx = None
-
 
 CallbackType = Callable[[Dict], None]
 
@@ -49,38 +43,42 @@ class BinanceSDKConnector:
     _http: Optional[httpx.AsyncClient] = field(default=None, init=False)
     _ws: Optional[websockets.WebSocketClientProtocol] = field(default=None, init=False)
 
-    def __post_init__(self) -> None:  # pragma: no cover - simple assignment
-        if Client is None:  # pragma: no cover - dependency missing
+    def __post_init__(self) -> None:
+        if Client is None:
             raise RuntimeError("python-binance package is required")
-        self._client = Client(self.api_key, self.api_secret, testnet=self.testnet)
+
+        logger.info(f"🧪 BinanceSDKConnector initializing... testnet={self.testnet}")
+        try:
+            self._client = Client(self.api_key, self.api_secret, testnet=self.testnet)
+            logger.info("✅ Binance Client created")
+        except Exception as e:
+            import traceback
+            logger.error(f"❌ Binance Client init failed: {e}")
+            logger.error(traceback.format_exc())
+            raise
+
         if self.testnet:
             self._client.API_URL = "https://testnet.binance.vision/api"
+            logger.info("🔧 Using testnet API URL")
 
-    # ------------------------------------------------------------------
-    # Balance and order helpers
-    # ------------------------------------------------------------------
     async def get_balance(self) -> Dict[str, float]:
-        """Return available BTC and USDT balances."""
-
         def _get_balance() -> Dict[str, float]:
             result: Dict[str, float] = {"BTC": 0.0, "USDT": 0.0}
             try:
                 bal = self._client.get_asset_balance(asset="BTC")
                 result["BTC"] = float(bal.get("free", 0.0)) if bal else 0.0
-            except Exception:  # pragma: no cover - network errors
+            except Exception:
                 pass
             try:
                 bal = self._client.get_asset_balance(asset="USDT")
                 result["USDT"] = float(bal.get("free", 0.0)) if bal else 0.0
-            except Exception:  # pragma: no cover - network errors
+            except Exception:
                 pass
             return result
 
         return await asyncio.to_thread(_get_balance)
 
     async def order_market_buy(self, symbol: str, quote_amount: float) -> Dict:
-        """Place a market buy order spending ``quote_amount`` USDT."""
-
         def _order() -> Dict:
             return self._client.create_order(
                 symbol=symbol,
@@ -92,8 +90,6 @@ class BinanceSDKConnector:
         return await asyncio.to_thread(_order)
 
     async def order_market_sell(self, symbol: str, quantity: float) -> Dict:
-        """Place a market sell order for ``quantity`` base asset."""
-
         def _order() -> Dict:
             return self._client.create_order(
                 symbol=symbol,
@@ -104,9 +100,6 @@ class BinanceSDKConnector:
 
         return await asyncio.to_thread(_order)
 
-    # ------------------------------------------------------------------
-    # Websocket handling
-    # ------------------------------------------------------------------
     async def __aenter__(self) -> "BinanceSDKConnector":
         return self
 
@@ -128,18 +121,15 @@ class BinanceSDKConnector:
         if self._http is not None:
             await self._http.aclose()
             self._http = None
-        # Ensure underlying HTTP session is properly closed to release resources
         session = getattr(self._client, "session", None)
         if session is not None:
             await asyncio.to_thread(session.close)
 
-    async def __aexit__(self, exc_type, exc, tb) -> None:  # pragma: no cover - simple pass
+    async def __aexit__(self, exc_type, exc, tb) -> None:
         await self.close()
 
     async def start_user_socket(self, callback: CallbackType) -> None:
-        """Start the user data stream and dispatch messages to ``callback``."""
-
-        if websockets is None or httpx is None:  # pragma: no cover - dependency missing
+        if websockets is None or httpx is None:
             raise RuntimeError("websockets and httpx packages are required")
 
         rest_base = "https://api.binance.com"
@@ -159,10 +149,12 @@ class BinanceSDKConnector:
                     resp.raise_for_status()
                     listen_key = resp.json().get("listenKey")
                     logger.info("listen key retrieved")
-                except asyncio.CancelledError:  # pragma: no cover - task cancelled
+                except asyncio.CancelledError:
                     raise
-                except Exception as exc:  # pragma: no cover - network errors
-                    logger.warning("failed to obtain listen key: %s", exc)
+                except Exception as exc:
+                    import traceback
+                    logger.error("❌ failed to obtain listen key: %s", exc)
+                    logger.error(traceback.format_exc())
                     await asyncio.sleep(5)
                     continue
 
@@ -180,11 +172,11 @@ class BinanceSDKConnector:
                                         params={"listenKey": listen_key},
                                         headers=headers,
                                     )
-                                except Exception as exc:  # pragma: no cover - network errors
+                                except Exception as exc:
                                     logger.warning("keepalive failed: %s", exc)
                                     await ws.close()
                                     break
-                        except asyncio.CancelledError:  # pragma: no cover - task cancelled
+                        except asyncio.CancelledError:
                             pass
                         finally:
                             logger.info("keepalive stopped")
@@ -197,9 +189,9 @@ class BinanceSDKConnector:
                             res = callback(data)
                             if inspect.isawaitable(res):
                                 await res
-                    except asyncio.CancelledError:  # pragma: no cover - task cancelled
+                    except asyncio.CancelledError:
                         raise
-                    except Exception as exc:  # pragma: no cover - network errors
+                    except Exception as exc:
                         logger.warning("websocket error: %s", exc)
                     finally:
                         if self._keepalive_task is not None:
@@ -212,4 +204,3 @@ class BinanceSDKConnector:
                         await asyncio.sleep(1)
 
         self._ws_task = asyncio.create_task(_runner())
-

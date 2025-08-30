@@ -19,6 +19,7 @@ async def watch_leader_orders(
     *,
     testnet: bool = False,
 ) -> AsyncIterator[dict]:
+    logger.info(f"👀 Entered watch_leader_orders with testnet={testnet}")
     """Yield leader account trade events from Binance user data stream.
 
     The underlying :class:`BinanceSDKConnector` manages the listen-key lifecycle
