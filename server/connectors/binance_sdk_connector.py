@@ -11,6 +11,7 @@ import asyncio
 import json
 import contextlib
 import logging
+import inspect
 from dataclasses import dataclass, field
 from typing import Callable, Dict, Optional
 
@@ -193,7 +194,9 @@ class BinanceSDKConnector:
                     try:
                         async for message in ws:
                             data = json.loads(message)
-                            callback(data)
+                            res = callback(data)
+                            if inspect.isawaitable(res):
+                                await res
                     except asyncio.CancelledError:  # pragma: no cover - task cancelled
                         raise
                     except Exception as exc:  # pragma: no cover - network errors
