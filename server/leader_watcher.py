@@ -1,4 +1,6 @@
-"""Leader account order watcher using Binance SDK."""
+"""Leader account order watcher using a Binance connector that manually
+manages WebSocket connections and listen-key lifecycles via HTTP and
+``websockets`` instead of the SDK's ``AsyncClient``."""
 
 from __future__ import annotations
 
@@ -20,7 +22,8 @@ async def watch_leader_orders(
     """Yield leader account trade events from Binance user data stream.
 
     The underlying :class:`BinanceSDKConnector` manages the listen-key lifecycle
-    and websocket connection using the official SDK's asynchronous client.
+    and websocket connection manually through HTTP requests and the
+    ``websockets`` library rather than relying on the SDK's ``AsyncClient``.
     This coroutine bridges the connector's callback-based stream into an async
     iterator.
     """
@@ -30,6 +33,8 @@ async def watch_leader_orders(
     queue: asyncio.Queue[Dict] = asyncio.Queue()
 
     async with BinanceSDKConnector(api_key, api_secret, testnet=testnet) as connector:
+        # The connector handles listen-key refresh and websocket management
+        # itself via HTTP and ``websockets``.
         # Push websocket messages into an asyncio queue for processing.
         def _handle_message(msg: Dict) -> None:  # pragma: no cover - simple callback
             queue.put_nowait(msg)
