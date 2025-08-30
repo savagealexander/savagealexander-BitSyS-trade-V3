@@ -58,24 +58,12 @@ async def watch_leader_orders(
                 free_btc = balances.get("BTC", free_btc)
                 if pending_fill:
                     fill = pending_fill
-                    pending_fill = None
-                    quote = float(fill.get("Z", 0.0))
-                    base = float(fill.get("z", 0.0))
-                    side = fill.get("S")
-                    if side == "BUY":
-                        pre_usdt = free_usdt + quote
-                        pre_btc = free_btc - base
-                    else:  # SELL
-                        pre_usdt = free_usdt - quote
-                        pre_btc = free_btc + base
                     yield {
-                        "event_id": fill.get("i"),
-                        "side": side,
-                        "quote_filled": quote,
-                        "base_filled": base,
-                        "leader_pre_usdt": max(pre_usdt, 1e-9),
-                        "leader_pre_btc": max(pre_btc, 1e-9),
+                        "type": "order_fill",
+                        "order": fill,  # the original pending_fill executionReport
+                        "balances": {"USDT": free_usdt, "BTC": free_btc},
                     }
+                    pending_fill = None
                 continue
 
             if etype != "executionReport":

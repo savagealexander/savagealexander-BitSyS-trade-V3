@@ -37,9 +37,10 @@ def test_buy_event_pre_balances(dummy_binance_sdk):
         "B": [{"a": "USDT", "f": "90.0"}, {"a": "BTC", "f": "1.001"}],
     }
     event = _run_test(exec_event, bal_event, dummy_binance_sdk)
-    assert event["event_id"] == 123
-    assert event["leader_pre_usdt"] == pytest.approx(100.0)
-    assert event["leader_pre_btc"] == pytest.approx(1.0)
+    assert event["type"] == "order_fill"
+    assert event["order"]["i"] == 123
+    assert event["balances"]["USDT"] == pytest.approx(90.0)
+    assert event["balances"]["BTC"] == pytest.approx(1.001)
 
 
 def test_sell_event_pre_balances(dummy_binance_sdk):
@@ -57,6 +58,7 @@ def test_sell_event_pre_balances(dummy_binance_sdk):
         "B": [{"a": "USDT", "f": "110.0"}, {"a": "BTC", "f": "0.999"}],
     }
     event = _run_test(exec_event, bal_event, dummy_binance_sdk)
-    assert event["event_id"] == 456
-    assert event["leader_pre_usdt"] == pytest.approx(100.0)
-    assert event["leader_pre_btc"] == pytest.approx(1.0)
+    assert event["type"] == "order_fill"
+    assert event["order"]["i"] == 456
+    assert event["balances"]["USDT"] == pytest.approx(110.0)
+    assert event["balances"]["BTC"] == pytest.approx(0.999)
