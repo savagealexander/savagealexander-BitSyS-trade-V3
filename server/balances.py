@@ -64,6 +64,7 @@ class BalanceService:
                         account.api_key, account.api_secret
                     )
             self._cache[account_name] = {**balance, "stale": False}
+            print(f"[BALANCE] {account_name}: BTC={balance.get('BTC', 0)}, USDT={balance.get('USDT', 0)}")
         except Exception:
             # Errors are swallowed to keep polling alive
             prev = self._cache.get(

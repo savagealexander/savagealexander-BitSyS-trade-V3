@@ -8,10 +8,25 @@ from typing import Any
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from starlette.middleware.cors import CORSMiddleware
+from .balances import balance_service
 
+
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("urllib3").setLevel(logging.WARNING)
 # -----------------------------------------------------------------------------
 # Logging: wire our app loggers to Uvicorn's console so INFO/DEBUG are visible.
 # -----------------------------------------------------------------------------
+def _quiet_lib_logs():
+    # 降噪：把第三方库的日志级别拉到 WARNING
+    for name in (
+        "uvicorn.access",
+        "httpx", "httpcore", "urllib3",
+        "websockets", "websockets.client", "websockets.server",
+        "asyncio",
+    ):
+        logging.getLogger(name).setLevel(logging.WARNING)
+
 def _setup_app_logging() -> None:
     """
     Make sure all `server.*` loggers print to the same console as uvicorn,
@@ -116,6 +131,8 @@ async def on_startup() -> None:
 @app.on_event("shutdown")
 async def on_shutdown() -> None:
     logging.getLogger("server").info("🛑 Application shutdown")
+    _quiet_lib_logs()
+    await balance_service.start()
 
 # -----------------------------------------------------------------------------
 # Local runner (optional)

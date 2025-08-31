@@ -59,10 +59,21 @@ async def watch_leader_orders(
                 free_btc = balances.get("BTC", free_btc)
                 if pending_fill:
                     fill = pending_fill
+                    # === 新增：稳妥的幂等事件ID（订单ID + 事件时间 + 累计成交额）===
+                    event_id = f"{fill.get('i')}-{fill.get('E')}-{fill.get('Z')}"
                     yield {
                         "type": "order_fill",
                         "order": fill,  # the original pending_fill executionReport
                         "balances": {"USDT": free_usdt, "BTC": free_btc},
+                         # 新增几个关键字段，供 copy_dispatcher 使用：
+                        "side": fill.get("S"),
+                        "base_filled": float(fill.get("z", 0.0)),
+                        "quote_filled": float(fill.get("Z", 0.0)),
+                        "leader_free_usdt": free_usdt,
+                        "leader_free_btc": free_btc,
+                        # === 新增：幂等键 + 交易对 ===
+                        "event_id": event_id,
+                        "symbol": fill.get("s"),
                     }
                     pending_fill = None
                 continue
